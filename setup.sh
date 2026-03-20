@@ -136,6 +136,13 @@ apt_install() {
     apt-get install -y --no-install-recommends "$@"
 }
 
+purge_legacy_node_packages() {
+    log "removing legacy Node.js packages that conflict with NodeSource"
+    apt-get purge -y nodejs npm libnode-dev nodejs-doc || true
+    apt-get -f install -y
+    apt-get autoremove -y
+}
+
 ensure_nodejs() {
     local node_major
 
@@ -155,6 +162,7 @@ ensure_nodejs() {
         log "installing Node.js 20"
     fi
 
+    purge_legacy_node_packages
     bash -c "$(curl -fsSL https://deb.nodesource.com/setup_20.x)"
     apt-get install -y --no-install-recommends nodejs
     log "installed Node.js $(node -v) and npm $(npm -v)"
