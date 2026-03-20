@@ -4,10 +4,16 @@ port: 7890
 {{ conf | except("proxy-groups", "port", "mode") | yaml }}
 
 proxy-groups:
-- name: '♻️ Automatic'
+- name: 'Automatic'
   type: 'url-test'
   url: 'http://www.gstatic.com/generate_204'
   interval: 300
   proxies:
-  {{ proxy_remarks | yaml | indent(2) }}
+{% if proxy_remarks %}
+{{ proxy_remarks | yaml | indent(4, true) }}
+{% else %}
+    []
+{% endif %}
+{% if conf.get("proxy-groups", []) %}
 {{ conf.get("proxy-groups", []) | yaml }}
+{% endif %}
