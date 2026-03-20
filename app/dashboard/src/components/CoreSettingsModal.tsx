@@ -72,6 +72,8 @@ export const ExitFullScreenIcon = chakra(ArrowsPointingInIcon, {
   },
 });
 
+const apiBaseURL = import.meta.env.VITE_BASE_API || "/api/";
+
 const getStatus = (status: string) => {
   return {
     [ReadyState.CONNECTING]: "connecting",
@@ -85,9 +87,9 @@ const getStatus = (status: string) => {
 const getWebsocketUrl = (nodeID: string) => {
   try {
     let baseURL = new URL(
-      import.meta.env.VITE_BASE_API.startsWith("/")
-        ? window.location.origin + import.meta.env.VITE_BASE_API
-        : import.meta.env.VITE_BASE_API
+      apiBaseURL.startsWith("/")
+        ? window.location.origin + apiBaseURL
+        : apiBaseURL
     );
 
     return (
@@ -151,7 +153,6 @@ const CoreSettingModalContent: FC = () => {
   useEffect(() => {
     if (isEditingCore) fetchCoreSettings();
   }, [isEditingCore]);
-  "".startsWith;
   const scrollShouldStayOnEnd = useRef(true);
   const updateLogs = useCallback(
     debounce((logs: string[]) => {
