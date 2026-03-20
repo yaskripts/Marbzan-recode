@@ -17,6 +17,7 @@ NGINX_SITE_NAME="${NGINX_SITE_NAME:-$SERVICE_NAME}"
 NGINX_SITE_FILE="/etc/nginx/sites-available/${NGINX_SITE_NAME}"
 UVICORN_PORT="${UVICORN_PORT:-8000}"
 DOMAIN="${DOMAIN:-}"
+PUBLIC_HOST="${PUBLIC_HOST:-}"
 EMAIL="${EMAIL:-}"
 ENABLE_SSL="${ENABLE_SSL:-false}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
@@ -34,6 +35,7 @@ Usage: sudo bash setup.sh [options]
 
 Options:
   --domain example.com        Domain for nginx/server_name
+  --public-host 1.2.3.4      Public IP/host when installing without a domain
   --email admin@example.com   Email for certbot
   --enable-ssl                Request Let's Encrypt certificate via certbot
   --admin-user admin          Dashboard username
@@ -68,6 +70,10 @@ parse_args() {
         case "$1" in
             --domain)
                 DOMAIN="${2:-}"
+                shift 2
+                ;;
+            --public-host)
+                PUBLIC_HOST="${2:-}"
                 shift 2
                 ;;
             --email)
@@ -124,6 +130,29 @@ parse_args() {
 
 random_password() {
     tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24
+}
+
+detect_public_host() {
+    local candidate
+
+    if [[ -n "$PUBLIC_HOST" ]]; then
+        return
+    fi
+
+    for resolver in \
+        "curl -4fsS --max-time 5 https://api.ipify.org" \
+        "curl -4fsS --max-time 5 https://ipv4.icanhazip.com" \
+        "hostname -I | awk '{print \$1}'" \
+        "ip route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i = 1; i <= NF; i++) if (\$i == \"src\") {print \$(i+1); exit}}'"
+    do
+        candidate="$(bash -lc "$resolver" 2>/dev/null | tr -d '\r\n' || true)"
+        candidate="${candidate%% *}"
+        if [[ -n "$candidate" ]]; then
+            PUBLIC_HOST="$candidate"
+            log "using public host ${PUBLIC_HOST}"
+            return
+        fi
+    done
 }
 
 run_as_app() {
@@ -236,7 +265,16 @@ configure_env() {
         ADMIN_PASSWORD="$(random_password)"
     fi
 
-    subscription_prefix="http://${DOMAIN:-_}"
+    if [[ "$ENABLE_SSL" == "true" && -z "$DOMAIN" ]]; then
+        die "--enable-ssl requires --domain"
+    fi
+
+    if [[ -z "$DOMAIN" ]]; then
+        detect_public_host
+        [[ -n "$PUBLIC_HOST" ]] || die "unable to detect public host, rerun setup.sh with --public-host <server-ip>"
+    fi
+
+    subscription_prefix="http://${PUBLIC_HOST:-$DOMAIN}"
     if [[ "$ENABLE_SSL" == "true" && -n "$DOMAIN" ]]; then
         subscription_prefix="https://${DOMAIN}"
     elif [[ -n "$DOMAIN" ]]; then
@@ -246,6 +284,8 @@ configure_env() {
     allowed_origins="http://127.0.0.1,http://localhost"
     if [[ -n "$DOMAIN" ]]; then
         allowed_origins="${allowed_origins},http://${DOMAIN},https://${DOMAIN}"
+    elif [[ -n "$PUBLIC_HOST" ]]; then
+        allowed_origins="${allowed_origins},http://${PUBLIC_HOST}"
     fi
 
     set_env_value "UVICORN_HOST" "127.0.0.1"
@@ -374,7 +414,7 @@ maybe_enable_ssl() {
 print_summary() {
     local protocol host
     protocol="http"
-    host="${DOMAIN:-SERVER_IP}"
+    host="${DOMAIN:-${PUBLIC_HOST:-SERVER_IP}}"
 
     if [[ "$ENABLE_SSL" == "true" && -n "$DOMAIN" ]]; then
         protocol="https"
@@ -405,6 +445,10 @@ main() {
 
     if ! command -v apt-get >/dev/null 2>&1; then
         die "this setup.sh currently supports Debian/Ubuntu hosts with apt-get"
+    fi
+
+    if [[ "$ENABLE_SSL" == "true" && -z "$DOMAIN" ]]; then
+        die "--enable-ssl requires --domain"
     fi
 
     repair_package_manager
