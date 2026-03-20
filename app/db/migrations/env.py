@@ -1,9 +1,12 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
+os.environ.setdefault("MARZBAN_MINIMAL_APP_IMPORT", "1")
 
 from app.db.base import Base
 from config import SQLALCHEMY_DATABASE_URL

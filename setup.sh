@@ -26,6 +26,7 @@ DEBIAN_FRONTEND=noninteractive
 APT_UPDATED=0
 NODE_MAJOR_REQUIRED="${NODE_MAJOR_REQUIRED:-18}"
 NODE_MAX_OLD_SPACE_SIZE="${NODE_MAX_OLD_SPACE_SIZE:-1536}"
+SETUPTOOLS_SPEC="${SETUPTOOLS_SPEC:-setuptools<81}"
 
 usage() {
     cat <<EOF
@@ -263,8 +264,14 @@ configure_env() {
 install_python_app() {
     log "creating virtualenv and installing python dependencies"
     run_as_app "python3 -m venv '$APP_DIR/.venv'"
-    run_as_app "'$APP_DIR/.venv/bin/pip' install --upgrade pip setuptools wheel"
+    run_as_app "'$APP_DIR/.venv/bin/pip' install --upgrade pip wheel '$SETUPTOOLS_SPEC'"
     run_as_app "cd '$APP_DIR' && '$APP_DIR/.venv/bin/pip' install -r requirements.txt"
+
+    if ! run_as_app "'$APP_DIR/.venv/bin/python' -c 'import pkg_resources'"; then
+        log "pkg_resources is missing, reinstalling setuptools compatibility package"
+        run_as_app "'$APP_DIR/.venv/bin/pip' install --force-reinstall '$SETUPTOOLS_SPEC'"
+        run_as_app "'$APP_DIR/.venv/bin/python' -c 'import pkg_resources'"
+    fi
 }
 
 build_dashboard() {

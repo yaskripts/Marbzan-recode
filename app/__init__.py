@@ -1,6 +1,6 @@
 import logging
+import os
 
-from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -20,10 +20,9 @@ app = FastAPI(
     redoc_url="/redoc" if DOCS else None,
 )
 
-scheduler = BackgroundScheduler(
-    {"apscheduler.job_defaults.max_instances": 20}, timezone="UTC"
-)
 logger = logging.getLogger("uvicorn.error")
+MINIMAL_APP_IMPORT = os.getenv("MARZBAN_MINIMAL_APP_IMPORT") == "1"
+scheduler = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,10 +31,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from app import dashboard, jobs, routers, telegram  # noqa
-from app.routers import api_router  # noqa
-
-app.include_router(api_router)
 
 
 def use_route_names_as_operation_ids(app: FastAPI) -> None:
@@ -44,11 +39,25 @@ def use_route_names_as_operation_ids(app: FastAPI) -> None:
             route.operation_id = route.name
 
 
-use_route_names_as_operation_ids(app)
+if not MINIMAL_APP_IMPORT:
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    scheduler = BackgroundScheduler(
+        {"apscheduler.job_defaults.max_instances": 20}, timezone="UTC"
+    )
+
+    from app import dashboard, jobs, routers, telegram  # noqa
+    from app.routers import api_router  # noqa
+
+    app.include_router(api_router)
+    use_route_names_as_operation_ids(app)
 
 
 @app.on_event("startup")
 def on_startup():
+    if scheduler is None:
+        return
+
     paths = [f"{r.path}/" for r in app.routes]
     paths.append("/api/")
     if f"/{XRAY_SUBSCRIPTION_PATH}/" in paths:
@@ -60,7 +69,8 @@ def on_startup():
 
 @app.on_event("shutdown")
 def on_shutdown():
-    scheduler.shutdown()
+    if scheduler is not None:
+        scheduler.shutdown()
 
 
 @app.exception_handler(RequestValidationError)
