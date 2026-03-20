@@ -136,6 +136,12 @@ apt_install() {
     apt-get install -y --no-install-recommends "$@"
 }
 
+repair_package_manager() {
+    log "repairing dpkg/apt state"
+    dpkg --configure -a || true
+    apt-get -f install -y
+}
+
 purge_legacy_node_packages() {
     log "removing legacy Node.js packages that conflict with NodeSource"
     apt-get purge -y nodejs npm libnode-dev nodejs-doc || true
@@ -384,6 +390,8 @@ main() {
     if ! command -v apt-get >/dev/null 2>&1; then
         die "this setup.sh currently supports Debian/Ubuntu hosts with apt-get"
     fi
+
+    repair_package_manager
 
     log "installing system packages"
     apt_install ca-certificates curl git nginx openssl python3 python3-pip python3-venv unzip
