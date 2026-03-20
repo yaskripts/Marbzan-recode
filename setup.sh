@@ -25,6 +25,7 @@ INSTALL_NODE="${INSTALL_NODE:-true}"
 DEBIAN_FRONTEND=noninteractive
 APT_UPDATED=0
 NODE_MAJOR_REQUIRED="${NODE_MAJOR_REQUIRED:-18}"
+NODE_MAX_OLD_SPACE_SIZE="${NODE_MAX_OLD_SPACE_SIZE:-1536}"
 
 usage() {
     cat <<EOF
@@ -274,7 +275,15 @@ build_dashboard() {
 
     log "building dashboard"
     run_as_app "cd '$APP_DIR/app/dashboard' && if [[ -f package-lock.json ]]; then npm ci; else npm install; fi"
-    run_as_app "cd '$APP_DIR/app/dashboard' && VITE_BASE_API=/api/ npm run build -- --outDir build --assetsDir statics"
+
+    if ! run_as_app "cd '$APP_DIR/app/dashboard' && NODE_OPTIONS=--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE} VITE_BASE_API=/api/ npm run build -- --outDir build --assetsDir statics"; then
+        if [[ -f "$APP_DIR/app/dashboard/build/index.html" ]]; then
+            log "dashboard build failed, using bundled app/dashboard/build"
+        else
+            die "dashboard build failed and no bundled app/dashboard/build is available"
+        fi
+    fi
+
     run_as_app "cp '$APP_DIR/app/dashboard/build/index.html' '$APP_DIR/app/dashboard/build/404.html'"
 }
 
