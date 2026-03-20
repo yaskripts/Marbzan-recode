@@ -1,0 +1,116 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "Telegram"
+        ],
+        "outboundTag": "TELEGRAM_MTPROTO"
+      },
+      {
+        "type": "field",
+        "ip": [
+          "geoip:private"
+        ],
+        "outboundTag": "BLOCK"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "Poland",
+      "listen": "0.0.0.0",
+      "port": 10000,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "Germany",
+      "listen": "0.0.0.0",
+      "port": 10001,
+      "protocol": "vmess",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/germany-vmess"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      }
+    },
+    {
+      "tag": "Netherlands",
+      "listen": "0.0.0.0",
+      "port": 10002,
+      "protocol": "trojan",
+      "settings": {
+        "clients": []
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "France",
+      "listen": "0.0.0.0",
+      "port": 10003,
+      "protocol": "shadowsocks",
+      "settings": {
+        "clients": [],
+        "network": "tcp,udp"
+      }
+    },
+    {
+      "tag": "Telegram",
+      "listen": "0.0.0.0",
+      "port": 3443,
+      "protocol": "mtproto",
+      "settings": {
+        "users": []
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "DIRECT"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "BLOCK"
+    },
+    {
+      "protocol": "mtproto",
+      "tag": "TELEGRAM_MTPROTO",
+      "settings": {}
+    }
+  ]
+}

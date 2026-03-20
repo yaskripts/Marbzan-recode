@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ user.username | e }} Subscription</title>
+    <style>
+        :root {
+            --bg: #07111f;
+            --bg-soft: rgba(10, 22, 38, 0.84);
+            --panel: rgba(14, 29, 48, 0.92);
+            --panel-soft: rgba(19, 37, 61, 0.86);
+            --line: rgba(132, 169, 214, 0.18);
+            --text: #eef5ff;
+            --muted: #97aac6;
+            --accent: #46b4ff;
+            --accent-soft: rgba(70, 180, 255, 0.16);
+            --green: #49d18c;
+            --orange: #ffb14a;
+            --red: #ff6d6d;
+            --gray: #9aa9bf;
+            --shadow: 0 20px 60px rgba(0, 0, 0, 0.34);
+            --radius: 22px;
+            --radius-sm: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(70, 180, 255, 0.18), transparent 30%),
+                radial-gradient(circle at top right, rgba(73, 209, 140, 0.14), transparent 24%),
+                linear-gradient(135deg, #04101d 0%, #081321 34%, #0a1a2f 100%);
+        }
+
+        .shell {
+            width: min(1180px, calc(100% - 32px));
+            margin: 28px auto;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-soft);
+            border: 1px solid var(--line);
+            border-radius: calc(var(--radius) + 4px);
+            box-shadow: var(--shadow);
+            padding: 28px;
+            backdrop-filter: blur(18px);
+        }
+
+        .hero::before,
+        .hero::after {
+            content: "";
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(12px);
+            opacity: 0.6;
+        }
+
+        .hero::before {
+            width: 220px;
+            height: 220px;
+            right: -40px;
+            top: -80px;
+            background: radial-gradient(circle, rgba(70, 180, 255, 0.35), transparent 65%);
+        }
+
+        .hero::after {
+            width: 180px;
+            height: 180px;
+            left: -40px;
+            bottom: -70px;
+            background: radial-gradient(circle, rgba(73, 209, 140, 0.18), transparent 65%);
+        }
+
+        .hero-top {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 14px 0 10px;
+            font-size: clamp(30px, 4vw, 46px);
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .subtitle {
+            max-width: 680px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 18px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.04);
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .user-chip strong {
+            color: var(--text);
+            font-size: 15px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+        }
+
+        .status::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: currentColor;
+            box-shadow: 0 0 18px currentColor;
+        }
+
+        .status.active {
+            color: var(--green);
+            background: rgba(73, 209, 140, 0.12);
+            border-color: rgba(73, 209, 140, 0.24);
+        }
+
+        .status.limited {
+            color: var(--red);
+            background: rgba(255, 109, 109, 0.12);
+            border-color: rgba(255, 109, 109, 0.24);
+        }
+
+        .status.expired {
+            color: var(--orange);
+            background: rgba(255, 177, 74, 0.12);
+            border-color: rgba(255, 177, 74, 0.24);
+        }
+
+        .status.disabled {
+            color: var(--gray);
+            background: rgba(154, 169, 191, 0.12);
+            border-color: rgba(154, 169, 191, 0.24);
+        }
+
+        .status.on_hold {
+            color: #b798ff;
+            background: rgba(183, 152, 255, 0.12);
+            border-color: rgba(183, 152, 255, 0.24);
+        }
+
+        .stats {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 28px;
+        }
+
+        .stat {
+            padding: 18px 18px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.035);
+        }
+
+        .stat-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            line-height: 1.15;
+            letter-spacing: -0.03em;
+        }
+
+        .stat-note {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 18px;
+            margin-top: 18px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 22px;
+            backdrop-filter: blur(18px);
+        }
+
+        .panel h2 {
+            margin: 0 0 8px;
+            font-size: 22px;
+            letter-spacing: -0.02em;
+        }
+
+        .panel-copy {
+            margin: 0 0 18px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .stack {
+            display: grid;
+            gap: 14px;
+        }
+
+        .card {
+            padding: 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(132, 169, 214, 0.16);
+            background: var(--panel-soft);
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.35;
+        }
+
+        .card-subtitle {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .protocol-tag {
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .field:last-child {
+            margin-bottom: 0;
+        }
+
+        .field-label {
+            color: var(--muted);
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .field-input {
+            width: 100%;
+            border: 1px solid rgba(132, 169, 214, 0.12);
+            background: rgba(2, 10, 18, 0.64);
+            color: var(--text);
+            border-radius: 14px;
+            padding: 13px 14px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .field-input[readonly] {
+            cursor: text;
+        }
+
+        .inline-meta {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .button,
+        .button-link {
+            appearance: none;
+            border: 0;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 42px;
+            padding: 0 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+        }
+
+        .button:hover,
+        .button-link:hover {
+            transform: translateY(-1px);
+        }
+
+        .button.primary,
+        .button-link.primary {
+            background: linear-gradient(135deg, #2d9cff, #48b7ff);
+            color: #03101d;
+        }
+
+        .button.secondary,
+        .button-link.secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text);
+            border: 1px solid rgba(132, 169, 214, 0.16);
+        }
+
+        .button.ghost,
+        .button-link.ghost {
+            background: rgba(73, 209, 140, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(73, 209, 140, 0.18);
+        }
+
+        .notice {
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 177, 74, 0.08);
+            border: 1px solid rgba(255, 177, 74, 0.18);
+            color: #ffd498;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .empty {
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px dashed rgba(132, 169, 214, 0.18);
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .blocked {
+            margin-top: 18px;
+            padding: 18px 20px;
+            border-radius: 18px;
+            background: rgba(255, 109, 109, 0.08);
+            border: 1px solid rgba(255, 109, 109, 0.18);
+            color: #ffb7b7;
+            line-height: 1.7;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(1, 8, 15, 0.76);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-card {
+            width: min(100%, 420px);
+            border-radius: 24px;
+            border: 1px solid var(--line);
+            background: rgba(8, 20, 34, 0.96);
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-head h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .close {
+            width: 38px;
+            height: 38px;
+            border: 0;
+            cursor: pointer;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text);
+            font-size: 18px;
+        }
+
+        #qrCodeContainer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            border-radius: 18px;
+            background: white;
+            min-height: 288px;
+        }
+
+        .modal-link {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            word-break: break-all;
+        }
+
+        @media (max-width: 980px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .shell {
+                width: min(100% - 18px, 100%);
+                margin: 12px auto 18px;
+            }
+
+            .hero,
+            .panel {
+                padding: 18px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .inline-meta {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+
+            .button,
+            .button-link {
+                width: 100%;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <div class="hero-top">
+                <div>
+                    <div class="eyebrow">Subscription Center</div>
+                    <h1>{{ user.username | e }}</h1>
+                    <p class="subtitle">
+                        Clean client profiles, direct connection links, QR export and manual MTProto data in one page.
+                    </p>
+                    <div class="user-chip">
+                        <span>User</span>
+                        <strong>{{ user.username | e }}</strong>
+                    </div>
+                </div>
+
+                <div class="status {{ user.status.value }}">
+                    {{ user.status.value.replace('_', ' ') | e }}
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-label">Data Limit</span>
+                    <div class="stat-value">
+                        {% if user.data_limit %}
+                        {{ user.data_limit | bytesformat }}
+                        {% else %}
+                        &infin;
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label">Used Traffic</span>
+                    <div class="stat-value">{{ user.used_traffic | bytesformat }}</div>
+                    {% if user.data_limit_reset_strategy != 'no_reset' %}
+                    <div class="stat-note">Resets every {{ user.data_limit_reset_strategy.value }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label">Expires</span>
+                    <div class="stat-value">
+                        {% if not user.expire %}
+                        &infin;
+                        {% else %}
+                        {{ user.expire | datetime }}
+                        {% endif %}
+                    </div>
+                    {% if user.expire %}
+                    {% set current_timestamp = now().timestamp() %}
+                    {% set remaining_days = ((user.expire - current_timestamp) // (24 * 3600)) %}
+                    <div class="stat-note">{{ remaining_days | int }} days remaining</div>
+                    {% endif %}
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label">Subscription URL</span>
+                    <div class="stat-value" style="font-size: 18px;">Ready</div>
+                    <div class="actions" style="margin-top: 12px;">
+                        <button class="button secondary js-copy" data-copy="{{ subscription_url | e }}">Copy link</button>
+                        <button class="button primary js-qr" data-qr="{{ subscription_url | e }}" data-title="Subscription QR">QR</button>
+                    </div>
+                </div>
+            </div>
+
+            {% if user.status.value != 'active' %}
+            <div class="blocked">
+                This subscription page is available, but export and connection actions are disabled because the account status is
+                <strong>{{ user.status.value.replace('_', ' ') | e }}</strong>.
+            </div>
+            {% endif %}
+        </section>
+
+        <div class="grid">
+            <section class="panel">
+                <h2>Client Profiles</h2>
+                <p class="panel-copy">
+                    One-click profile endpoints for common clients. Use the direct import URL or copy it for your app.
+                </p>
+
+                {% if user.status.value == 'active' %}
+                <div class="stack">
+                    {% for item in client_links %}
+                    <article class="card">
+                        <div class="card-top">
+                            <div>
+                                <h3 class="card-title">{{ item.title | e }}</h3>
+                                <p class="card-subtitle">{{ item.subtitle | e }}</p>
+                            </div>
+                            <span class="protocol-tag">{{ item.format | e }}</span>
+                        </div>
+
+                        <div class="field">
+                            <label class="field-label">Import URL</label>
+                            <input class="field-input" type="text" value="{{ item.url | e }}" readonly>
+                        </div>
+
+                        <div class="actions">
+                            <a class="button-link primary" href="{{ item.url | e }}" target="_blank" rel="noopener noreferrer">Open</a>
+                            <button class="button secondary js-copy" data-copy="{{ item.url | e }}">Copy</button>
+                            <button class="button secondary js-qr" data-qr="{{ item.url | e }}" data-title="{{ item.title | e }} QR">QR</button>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty">Enable the user first to download or import client profiles.</div>
+                {% endif %}
+            </section>
+
+            <section class="panel">
+                <h2>Connection Links</h2>
+                <p class="panel-copy">
+                    Direct proxy links with custom names. These names are rendered from your host remarks, so labels like
+                    <strong>Poland - {{ user.username }}</strong> work as expected.
+                </p>
+
+                {% if user.status.value == 'active' and connection_links %}
+                <div class="stack">
+                    {% for item in connection_links %}
+                    <article class="card">
+                        <div class="card-top">
+                            <div>
+                                <h3 class="card-title">{{ item.title | e }}</h3>
+                                <p class="card-subtitle">Direct link for manual import or QR transfer</p>
+                            </div>
+                            <span class="protocol-tag">{{ item.protocol | e }}</span>
+                        </div>
+
+                        <div class="field">
+                            <label class="field-label">Link</label>
+                            <input class="field-input" type="text" value="{{ item.link | e }}" readonly>
+                        </div>
+
+                        <div class="actions">
+                            <button class="button secondary js-copy" data-copy="{{ item.link | e }}">Copy</button>
+                            <button class="button primary js-qr" data-qr="{{ item.link | e }}" data-title="{{ item.title | e }} QR">QR</button>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% elif user.status.value != 'active' %}
+                <div class="empty">Connection links are hidden while the user is not active.</div>
+                {% else %}
+                <div class="empty">No direct share links are available for this user.</div>
+                {% endif %}
+
+                {% if user.status.value == 'active' and manual_connections %}
+                <div style="margin-top: 22px;">
+                    <h2 style="margin-bottom: 8px;">MTProto</h2>
+                    <p class="panel-copy" style="margin-bottom: 14px;">
+                        Telegram MTProto uses <strong>server</strong>, <strong>port</strong> and <strong>secret</strong>. This protocol does not use username/password authentication.
+                    </p>
+
+                    <div class="stack">
+                        {% for item in manual_connections %}
+                        <article class="card">
+                            <div class="card-top">
+                                <div>
+                                    <h3 class="card-title">{{ item.title | e }}</h3>
+                                    <p class="card-subtitle">Telegram proxy settings</p>
+                                </div>
+                                <span class="protocol-tag">{{ item.protocol | e }}</span>
+                            </div>
+
+                            <div class="inline-meta">
+                                <div class="field">
+                                    <label class="field-label">Server</label>
+                                    <input class="field-input" type="text" value="{{ item.server | e }}" readonly>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Port</label>
+                                    <input class="field-input" type="text" value="{{ item.port | e }}" readonly>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="field-label">Secret</label>
+                                <input class="field-input" type="text" value="{{ item.secret | e }}" readonly>
+                            </div>
+
+                            <div class="actions">
+                                <a class="button-link ghost" href="{{ item.share_url | e }}" target="_blank" rel="noopener noreferrer">Open in Telegram</a>
+                                <button class="button secondary js-copy" data-copy="{{ item.secret | e }}">Copy secret</button>
+                                <button class="button primary js-qr" data-qr="{{ item.share_url | e }}" data-title="{{ item.title | e }} MTProto">QR</button>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+
+                    <div class="notice">
+                        If you want labels like <strong>Poland - {{ user.username }}</strong>, set the host remark to a template such as
+                        <strong>Poland - {name}</strong> or <strong>Poland - {USERNAME}</strong>.
+                    </div>
+                </div>
+                {% endif %}
+            </section>
+        </div>
+    </div>
+
+    <div class="modal" id="qrModal">
+        <div class="modal-card">
+            <div class="modal-head">
+                <h3 id="qrTitle">QR Code</h3>
+                <button class="close" id="closeQrModal" type="button">×</button>
+            </div>
+            <div id="qrCodeContainer"></div>
+            <div class="modal-link" id="qrText"></div>
+        </div>
+    </div>
+
+    <script>
+        const qrModal = document.getElementById("qrModal");
+        const qrContainer = document.getElementById("qrCodeContainer");
+        const qrTitle = document.getElementById("qrTitle");
+        const qrText = document.getElementById("qrText");
+
+        async function copyText(value, button) {
+            try {
+                await navigator.clipboard.writeText(value);
+            } catch (error) {
+                const tempInput = document.createElement("input");
+                tempInput.value = value;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand("copy");
+                document.body.removeChild(tempInput);
+            }
+
+            const initialText = button.textContent;
+            button.textContent = "Copied";
+            window.setTimeout(() => {
+                button.textContent = initialText;
+            }, 1400);
+        }
+
+        function openQrModal(value, title) {
+            qrContainer.innerHTML = "";
+            qrTitle.textContent = title || "QR Code";
+            qrText.textContent = value;
+
+            new QRCode(qrContainer, {
+                text: value,
+                width: 260,
+                height: 260,
+                correctLevel: QRCode.CorrectLevel.M
+            });
+
+            qrModal.classList.add("open");
+        }
+
+        function closeQrModal() {
+            qrModal.classList.remove("open");
+        }
+
+        document.querySelectorAll(".js-copy").forEach((button) => {
+            button.addEventListener("click", () => copyText(button.dataset.copy, button));
+        });
+
+        document.querySelectorAll(".js-qr").forEach((button) => {
+            button.addEventListener("click", () => openQrModal(button.dataset.qr, button.dataset.title));
+        });
+
+        document.getElementById("closeQrModal").addEventListener("click", closeQrModal);
+        qrModal.addEventListener("click", (event) => {
+            if (event.target === qrModal) {
+                closeQrModal();
+            }
+        });
+    </script>
+</body>
+</html>
