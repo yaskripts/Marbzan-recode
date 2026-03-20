@@ -24,6 +24,7 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 INSTALL_NODE="${INSTALL_NODE:-true}"
 DEBIAN_FRONTEND=noninteractive
 APT_UPDATED=0
+NODE_MAJOR_REQUIRED="${NODE_MAJOR_REQUIRED:-18}"
 
 usage() {
     cat <<EOF
@@ -135,6 +136,30 @@ apt_install() {
     apt-get install -y --no-install-recommends "$@"
 }
 
+ensure_nodejs() {
+    local node_major
+
+    if [[ "$INSTALL_NODE" != "true" ]]; then
+        return
+    fi
+
+    if command -v node >/dev/null 2>&1; then
+        node_major="$(node -p 'process.versions.node.split(".")[0]')"
+        if [[ "$node_major" -ge "$NODE_MAJOR_REQUIRED" ]]; then
+            log "using existing Node.js $(node -v)"
+            return
+        fi
+
+        log "existing Node.js $(node -v) is too old, upgrading to Node.js 20"
+    else
+        log "installing Node.js 20"
+    fi
+
+    bash -c "$(curl -fsSL https://deb.nodesource.com/setup_20.x)"
+    apt-get install -y --no-install-recommends nodejs
+    log "installed Node.js $(node -v) and npm $(npm -v)"
+}
+
 create_user_if_missing() {
     if ! id -u "$APP_USER" >/dev/null 2>&1; then
         log "creating system user $APP_USER"
@@ -225,7 +250,7 @@ install_python_app() {
 
 build_dashboard() {
     if [[ "$INSTALL_NODE" != "true" ]]; then
-        log "skipping node/npm installation and dashboard build"
+        log "skipping dashboard rebuild and using bundled app/dashboard/build"
         return
     fi
 
@@ -351,13 +376,11 @@ main() {
     log "installing system packages"
     apt_install ca-certificates curl git nginx openssl python3 python3-pip python3-venv unzip
 
-    if [[ "$INSTALL_NODE" == "true" ]]; then
-        apt_install nodejs npm
-    fi
-
     if [[ "$ENABLE_SSL" == "true" ]]; then
         apt_install certbot python3-certbot-nginx
     fi
+
+    ensure_nodejs
 
     create_user_if_missing
     clone_or_update_repo
