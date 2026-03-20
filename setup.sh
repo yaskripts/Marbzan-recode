@@ -175,12 +175,16 @@ create_user_if_missing() {
     fi
 }
 
+git_repo() {
+    git -c safe.directory="$APP_DIR" -C "$APP_DIR" "$@"
+}
+
 clone_or_update_repo() {
     if [[ -d "$APP_DIR/.git" ]]; then
         log "updating repository in $APP_DIR"
-        git -C "$APP_DIR" fetch --all --prune
-        git -C "$APP_DIR" checkout "$BRANCH"
-        git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
+        git_repo fetch --all --prune
+        git_repo checkout "$BRANCH"
+        git_repo pull --ff-only origin "$BRANCH"
     else
         log "cloning repository into $APP_DIR"
         rm -rf "$APP_DIR"
