@@ -2,6 +2,8 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from OpenSSL import crypto
 
+CERT_VALIDITY_SECONDS = 50 * 365 * 24 * 60 * 60
+
 
 def get_cert_SANs(cert: bytes):
     cert = x509.load_pem_x509_certificate(cert, default_backend())
@@ -20,7 +22,9 @@ def generate_certificate():
     cert = crypto.X509()
     cert.get_subject().CN = "Gozargah"
     cert.gmtime_adj_notBefore(0)
-    cert.gmtime_adj_notAfter(100*365*24*60*60)
+    # Keep the default cert lifetime comfortably below the 32-bit limit
+    # used by pyOpenSSL on Windows so migrations work cross-platform.
+    cert.gmtime_adj_notAfter(CERT_VALIDITY_SECONDS)
     cert.set_issuer(cert.get_subject())
     cert.set_pubkey(k)
     cert.sign(k, 'sha512')
