@@ -70,8 +70,6 @@ rt_bw = RealtimeBandwidth(
     incoming_bytes=0, outgoing_bytes=0, incoming_packets=0, outgoing_packets=0)
 
 
-# sample time is 2 seconds, values lower than this may not produce good results
-@scheduler.scheduled_job("interval", seconds=2, coalesce=True, max_instances=1)
 def record_realtime_bandwidth() -> None:
     global rt_bw
     last_perf_counter = rt_bw.last_perf_counter
@@ -82,6 +80,16 @@ def record_realtime_bandwidth() -> None:
     rt_bw.outgoing_bytes, rt_bw.bytes_sent = round((io.bytes_sent - rt_bw.bytes_sent) / sample_time), io.bytes_sent
     rt_bw.incoming_packets, rt_bw.packets_recv = round((io.packets_recv - rt_bw.packets_recv) / sample_time), io.packets_recv
     rt_bw.outgoing_packets, rt_bw.packets_sent = round((io.packets_sent - rt_bw.packets_sent) / sample_time), io.packets_sent
+
+
+if scheduler is not None:
+    # sample time is 2 seconds, values lower than this may not produce good results
+    record_realtime_bandwidth = scheduler.scheduled_job(
+        "interval",
+        seconds=2,
+        coalesce=True,
+        max_instances=1,
+    )(record_realtime_bandwidth)
 
 
 def realtime_bandwidth() -> RealtimeBandwidthStat:
