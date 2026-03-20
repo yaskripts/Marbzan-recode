@@ -345,6 +345,15 @@ const AccordionInbound: FC<AccordionInboundType> = ({
                                     </Text>
                                     <Text mt={1}>
                                       <Badge>
+                                        {"{"}COUNTRY{"}"}
+                                      </Badge>{" "}
+                                      {t("hostsDialog.country", {
+                                        defaultValue:
+                                          "Country name for the config",
+                                      })}
+                                    </Text>
+                                    <Text mt={1}>
+                                      <Badge>
                                         {"{"}INBOUND_TAG{"}"}
                                       </Badge>{" "}
                                       {t("hostsDialog.inboundTag", {

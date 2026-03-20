@@ -55,7 +55,7 @@ def add_default_host(db: Session, inbound: ProxyInbound):
         inbound (ProxyInbound): Proxy inbound to add the default host to.
     """
     host = ProxyHost(
-        remark="{INBOUND_TAG} - {name}",
+        remark="{COUNTRY} - {name}",
         address="{SERVER_IP}",
         inbound=inbound,
     )

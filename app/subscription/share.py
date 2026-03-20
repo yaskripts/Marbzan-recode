@@ -83,6 +83,8 @@ def iter_resolved_hosts(
                 "protocol": protocol.value,
                 "TRANSPORT": inbound["network"],
                 "transport": inbound["network"],
+                "COUNTRY": tag,
+                "country": tag,
                 "INBOUND_TAG": tag,
                 "inbound_tag": tag,
             }
@@ -162,9 +164,11 @@ def iter_resolved_hosts(
                 }
             )
 
+            remark_template = host["remark"] or "{COUNTRY} - {name}"
+
             yield {
                 "tag": tag,
-                "remark": host["remark"].format_map(current_variables),
+                "remark": remark_template.format_map(current_variables),
                 "address": address.format_map(current_variables),
                 "inbound": host_inbound,
                 "settings": settings.model_dump(),
@@ -506,6 +510,8 @@ def setup_format_variables(extra_data: dict) -> dict:
             "protocol": "{protocol}",
             "TRANSPORT": "{TRANSPORT}",
             "transport": "{transport}",
+            "COUNTRY": "{COUNTRY}",
+            "country": "{country}",
             "INBOUND_TAG": "{INBOUND_TAG}",
             "inbound_tag": "{inbound_tag}",
             "ADDRESS": "{ADDRESS}",
