@@ -453,6 +453,7 @@ compute_hysteria2_pin() {
 generate_hysteria2_self_signed_cert() {
     local host="$1"
     local san
+    local openssl_config
 
     install -d -m 0755 "$HYSTERIA2_CERT_DIR"
 
@@ -463,12 +464,27 @@ generate_hysteria2_self_signed_cert() {
     fi
 
     log "generating self-signed certificate for Hysteria2 (${host})"
+    openssl_config="$(mktemp)"
+    cat >"$openssl_config" <<EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = ${host}
+
+[v3_req]
+subjectAltName = ${san}
+EOF
+
     openssl req -x509 -nodes -newkey rsa:2048 \
         -keyout "$HYSTERIA2_KEY_FILE" \
         -out "$HYSTERIA2_CERT_FILE" \
         -days 3650 \
-        -subj "/CN=${host}" \
-        -addext "subjectAltName = ${san}" >/dev/null 2>&1
+        -config "$openssl_config" \
+        -extensions v3_req >/dev/null
+    rm -f "$openssl_config"
 }
 
 configure_hysteria2_env() {
