@@ -96,8 +96,8 @@ export const Pagination: FC = () => {
 
   const handlePageSizeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     onFilterChange({
-      ...filters,
       limit: parseInt(e.target.value),
+      offset: 0,
     });
     setUsersPerPageLimitSize(e.target.value);
   };

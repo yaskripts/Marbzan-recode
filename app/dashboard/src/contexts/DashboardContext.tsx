@@ -76,13 +76,34 @@ type DashboardStateType = {
   revokeSubscription: (user: User) => Promise<void>;
 };
 
-const fetchUsers = (query: FilterType): Promise<User[]> => {
-  for (const key in query) {
-    if (!query[key as keyof FilterType]) delete query[key as keyof FilterType];
+type UsersResponse = {
+  users: User[];
+  total: number;
+};
+
+const fetchUsers = (query: FilterType): Promise<UsersResponse> => {
+  const normalizedQuery = { ...query };
+  for (const key in normalizedQuery) {
+    if (!normalizedQuery[key as keyof FilterType])
+      delete normalizedQuery[key as keyof FilterType];
   }
   useDashboard.setState({ loading: true });
-  return fetch("/users", { query })
+  return fetch("/users", { query: normalizedQuery })
     .then((users) => {
+      const currentOffset = normalizedQuery.offset || 0;
+      if (users.total > 0 && users.users.length === 0 && currentOffset > 0) {
+        useDashboard.setState((state) => ({
+          filters: {
+            ...state.filters,
+            offset: 0,
+          },
+        }));
+        return fetchUsers({
+          ...useDashboard.getState().filters,
+          offset: 0,
+        });
+      }
+
       useDashboard.setState({ users });
       return users;
     })
@@ -123,8 +144,8 @@ export const useDashboard = create(
     resetUsageUser: null,
     revokeSubscriptionUser: null,
     filters: {
-      username: "",
       limit: getUsersPerPageLimitSize(),
+      offset: 0,
       sort: "-created_at",
     },
     inbounds: new Map(),
