@@ -301,7 +301,10 @@ class UserResponse(User):
     @model_validator(mode="after")
     def validate_links(self):
         if not self.links:
-            self.links = generate_user_links(self)
+            try:
+                self.links = generate_user_links(self)
+            except Exception:
+                self.links = []
         return self
 
     @model_validator(mode="after")

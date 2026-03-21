@@ -67,7 +67,20 @@ def _render_name_template(template: str, variables: dict) -> str:
 
     try:
         return template.format_map(variables)
-    except (KeyError, ValueError):
+    except (KeyError, ValueError, AttributeError):
+        return template
+
+
+def _render_template_value(template: str, variables: dict) -> str:
+    if template is None:
+        return ""
+
+    if not isinstance(template, str):
+        return str(template)
+
+    try:
+        return template.format_map(variables)
+    except (KeyError, ValueError, AttributeError):
         return template
 
 
@@ -174,90 +187,101 @@ def iter_resolved_hosts(
             continue
 
         for host in xray.hosts.get(tag, []):
-            current_variables = defaultdict(
-                base_variables.default_factory,
-                dict(base_variables),
-            )
-            host_inbound = inbound.copy()
+            try:
+                current_variables = defaultdict(
+                    base_variables.default_factory,
+                    dict(base_variables),
+                )
+                host_inbound = inbound.copy()
 
-            sni = ""
-            sni_list = host["sni"] or inbound["sni"]
-            if sni_list:
-                salt = secrets.token_hex(8)
-                sni = random.choice(sni_list).replace("*", salt)
+                sni = ""
+                sni_list = host["sni"] or inbound["sni"]
+                if sni_list:
+                    salt = secrets.token_hex(8)
+                    sni = random.choice(sni_list).replace("*", salt)
 
-            if sids := inbound.get("sids"):
-                host_inbound["sid"] = random.choice(sids)
+                if sids := inbound.get("sids"):
+                    host_inbound["sid"] = random.choice(sids)
 
-            req_host = ""
-            req_host_list = host["host"] or inbound["host"]
-            if req_host_list:
-                salt = secrets.token_hex(8)
-                req_host = random.choice(req_host_list).replace("*", salt)
+                req_host = ""
+                req_host_list = host["host"] or inbound["host"]
+                if req_host_list:
+                    salt = secrets.token_hex(8)
+                    req_host = random.choice(req_host_list).replace("*", salt)
 
-            address = ""
-            address_list = host["address"]
-            if address_list:
-                salt = secrets.token_hex(8)
-                address = random.choice(address_list).replace("*", salt)
+                address = ""
+                address_list = host["address"]
+                if address_list:
+                    salt = secrets.token_hex(8)
+                    address = random.choice(address_list).replace("*", salt)
 
-            if host["path"] is not None:
-                path = host["path"].format_map(current_variables)
-            else:
-                path = inbound.get("path", "").format_map(current_variables)
+                path_template = (
+                    host["path"] if host["path"] is not None else inbound.get("path", "")
+                )
+                path = _render_template_value(path_template, current_variables)
 
-            if host.get("use_sni_as_host", False) and sni:
-                req_host = sni
+                if host.get("use_sni_as_host", False) and sni:
+                    req_host = sni
 
-            if host["allowinsecure"] is None:
-                allow_insecure = inbound.get("allowinsecure", "")
-                if allow_insecure in ("", None) and inbound.get("tls") == "tls":
-                    allow_insecure = XRAY_TLS_ALLOW_INSECURE
-            else:
-                allow_insecure = host["allowinsecure"]
+                if host["allowinsecure"] is None:
+                    allow_insecure = inbound.get("allowinsecure", "")
+                    if allow_insecure in ("", None) and inbound.get("tls") == "tls":
+                        allow_insecure = XRAY_TLS_ALLOW_INSECURE
+                else:
+                    allow_insecure = host["allowinsecure"]
 
-            host_inbound.update(
-                {
-                    "port": host["port"] or inbound["port"],
-                    "sni": sni,
-                    "host": req_host,
-                    "tls": inbound["tls"] if host["tls"] is None else host["tls"],
-                    "alpn": host["alpn"] if host["alpn"] else None,
-                    "path": path,
-                    "fp": host["fingerprint"] or inbound.get("fp", ""),
-                    "ais": allow_insecure,
-                    "mux_enable": host["mux_enable"],
-                    "fragment_setting": host["fragment_setting"],
-                    "noise_setting": host["noise_setting"],
-                    "random_user_agent": host["random_user_agent"],
+                host_inbound.update(
+                    {
+                        "port": host["port"] or inbound["port"],
+                        "sni": sni,
+                        "host": req_host,
+                        "tls": inbound["tls"] if host["tls"] is None else host["tls"],
+                        "alpn": host["alpn"] if host["alpn"] else None,
+                        "path": path,
+                        "fp": host["fingerprint"] or inbound.get("fp", ""),
+                        "ais": allow_insecure,
+                        "mux_enable": host["mux_enable"],
+                        "fragment_setting": host["fragment_setting"],
+                        "noise_setting": host["noise_setting"],
+                        "random_user_agent": host["random_user_agent"],
+                    }
+                )
+
+                rendered_address = _render_template_value(address, current_variables)
+                if (
+                    not rendered_address
+                    or "{" in rendered_address
+                    or "}" in rendered_address
+                ):
+                    continue
+
+                current_variables.update(
+                    {
+                        "ADDRESS": rendered_address,
+                        "address": rendered_address,
+                        "PORT": host_inbound["port"],
+                        "port": host_inbound["port"],
+                        "SNI": sni,
+                        "sni": sni,
+                        "HOST": req_host,
+                        "host": req_host,
+                        "PATH": path,
+                        "path": path,
+                    }
+                )
+
+                remark_template = settings.config_name or host["remark"] or "{name}"
+
+                yield {
+                    "tag": tag,
+                    "remark": _render_name_template(remark_template, current_variables),
+                    "address": rendered_address,
+                    "inbound": host_inbound,
+                    "settings": settings.model_dump(),
+                    "format_variables": current_variables,
                 }
-            )
-
-            current_variables.update(
-                {
-                    "ADDRESS": address,
-                    "address": address,
-                    "PORT": host_inbound["port"],
-                    "port": host_inbound["port"],
-                    "SNI": sni,
-                    "sni": sni,
-                    "HOST": req_host,
-                    "host": req_host,
-                    "PATH": path,
-                    "path": path,
-                }
-            )
-
-            remark_template = settings.config_name or host["remark"] or "{name}"
-
-            yield {
-                "tag": tag,
-                "remark": _render_name_template(remark_template, current_variables),
-                "address": address.format_map(current_variables),
-                "inbound": host_inbound,
-                "settings": settings.model_dump(),
-                "format_variables": current_variables,
-            }
+            except Exception:
+                continue
 
 
 def generate_v2ray_links(proxies: dict, inbounds: dict, extra_data: dict, reverse: bool) -> list:
