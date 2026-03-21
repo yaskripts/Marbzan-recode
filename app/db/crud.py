@@ -257,6 +257,14 @@ def get_users(db: Session,
     """
     query = get_user_queryset(db)
 
+    if usernames:
+        usernames = [username for username in usernames if username and username.strip()]
+        if not usernames:
+            usernames = None
+
+    if offset is not None and offset < 0:
+        offset = 0
+
     if search:
         query = query.filter(or_(User.username.ilike(f"%{search}%"), User.note.ilike(f"%{search}%")))
 
@@ -283,6 +291,8 @@ def get_users(db: Session,
 
     if return_with_count:
         count = query.count()
+        if offset and count and offset >= count:
+            offset = 0
 
     if sort:
         query = query.order_by(*(opt.value for opt in sort))
