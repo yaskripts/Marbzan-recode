@@ -213,6 +213,16 @@ def get_users(
     admin: Admin = Depends(Admin.get_current),
 ):
     """Get all users"""
+    if username:
+        username = [item for item in username if item and item.strip()]
+        if not username:
+            username = None
+
+    if owner:
+        owner = [item for item in owner if item and item.strip()]
+        if not owner:
+            owner = None
+
     if sort is not None:
         opts = sort.strip(",").split(",")
         sort = []
