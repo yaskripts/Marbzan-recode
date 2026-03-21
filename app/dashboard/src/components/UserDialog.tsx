@@ -227,6 +227,36 @@ const schema = z.discriminatedUnion("status", [
   }),
 ]);
 
+const extractApiErrorMessages = (err: any): string[] => {
+  const detail = err?.response?._data?.detail;
+
+  if (typeof detail === "string" && detail.trim().length > 0) {
+    return [detail];
+  }
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((entry) => {
+        if (typeof entry === "string") return entry;
+        if (entry?.msg) return String(entry.msg);
+        return "";
+      })
+      .filter(Boolean);
+  }
+
+  if (detail && typeof detail === "object") {
+    return Object.values(detail)
+      .map((value) => String(value))
+      .filter(Boolean);
+  }
+
+  if (err?.message) {
+    return [String(err.message)];
+  }
+
+  return ["Request failed"];
+};
+
 export const UserDialog: FC<UserDialogProps> = () => {
   const {
     editingUser,
@@ -337,20 +367,31 @@ export const UserDialog: FC<UserDialogProps> = () => {
         onClose();
       })
       .catch((err) => {
-        if (err?.response?.status === 409 || err?.response?.status === 400)
-          setError(err?.response?._data?.detail);
-        if (err?.response?.status === 422) {
-          Object.keys(err.response._data.detail).forEach((key) => {
-            setError(err?.response._data.detail[key] as string);
-            form.setError(
-              key as "proxies" | "username" | "data_limit" | "expire",
-              {
-                type: "custom",
-                message: err.response._data.detail[key],
-              }
-            );
-          });
+        const messages = extractApiErrorMessages(err);
+        setError(messages[0]);
+
+        if (err?.response?.status === 422 && err?.response?._data?.detail) {
+          const detail = err.response._data.detail;
+          if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+            Object.keys(detail).forEach((key) => {
+              form.setError(
+                key as "proxies" | "username" | "data_limit" | "expire",
+                {
+                  type: "custom",
+                  message: String(detail[key]),
+                }
+              );
+            });
+          }
         }
+
+        toast({
+          title: messages[0],
+          status: "error",
+          isClosable: true,
+          position: "top",
+          duration: 5000,
+        });
       })
       .finally(() => {
         setLoading(false);
