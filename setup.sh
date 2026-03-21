@@ -177,7 +177,7 @@ parse_args() {
 }
 
 random_password() {
-    tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24
+    openssl rand -hex 12
 }
 
 detect_public_host() {
