@@ -282,9 +282,30 @@ git_repo() {
     git -c safe.directory="$APP_DIR" -C "$APP_DIR" "$@"
 }
 
+backup_local_repo_file_if_dirty() {
+    local rel_path="$1"
+    local source_path backup_path timestamp
+
+    source_path="$APP_DIR/$rel_path"
+    if [[ ! -f "$source_path" ]]; then
+        return
+    fi
+
+    if git_repo diff --quiet -- "$rel_path"; then
+        return
+    fi
+
+    timestamp="$(date +%Y%m%d-%H%M%S)"
+    backup_path="${source_path}.pre-update.${timestamp}.bak"
+    cp "$source_path" "$backup_path"
+    log "backed up local ${rel_path} to ${backup_path}"
+    git_repo checkout -- "$rel_path"
+}
+
 clone_or_update_repo() {
     if [[ -d "$APP_DIR/.git" ]]; then
         log "updating repository in $APP_DIR"
+        backup_local_repo_file_if_dirty "xray_config.json"
         git_repo fetch --all --prune
         git_repo checkout "$BRANCH"
         git_repo pull --ff-only origin "$BRANCH"
