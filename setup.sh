@@ -483,7 +483,7 @@ EOF
         -out "$HYSTERIA2_CERT_FILE" \
         -days 3650 \
         -config "$openssl_config" \
-        -extensions v3_req >/dev/null
+        -extensions v3_req >/dev/null 2>&1
     rm -f "$openssl_config"
 }
 
@@ -797,9 +797,11 @@ main() {
     maybe_enable_ssl
     install_hysteria2_binary
     configure_hysteria2_env
+    log "restarting ${SERVICE_NAME}"
     systemctl restart "$SERVICE_NAME"
     write_hysteria2_config
     write_hysteria2_sysctl
+    log "restarting ${HYSTERIA2_SERVICE_NAME}"
     enable_hysteria2_service
     print_summary
 }
