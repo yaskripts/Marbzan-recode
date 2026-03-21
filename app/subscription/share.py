@@ -10,6 +10,19 @@ from urllib import parse as urlparse
 
 from jdatetime import date as jd
 
+from app.hysteria2 import (
+    build_uri as build_hysteria2_uri,
+    build_userpass,
+    get_client_speed,
+    get_obfs_password,
+    get_pin_sha256,
+    get_port_hop_interval,
+    get_public_host as get_hysteria2_public_host,
+    get_public_port as get_hysteria2_public_port,
+    get_server_name as get_hysteria2_server_name,
+)
+from app.mtproxy import build_manual_connection as build_mtproxy_manual_connection
+from app.protocols import get_inbounds_by_tag
 from app import xray
 from app.utils.system import get_public_ip, get_public_ipv6, readable_size
 
@@ -46,6 +59,16 @@ STATUS_TEXTS = {
 }
 
 
+def _render_name_template(template: str, variables: dict) -> str:
+    if not template:
+        return ""
+
+    try:
+        return template.format_map(variables)
+    except (KeyError, ValueError):
+        return template
+
+
 def _sorted_inbounds(inbounds: dict) -> List[Tuple]:
     resolved = []
     for protocol, tags in inbounds.items():
@@ -54,7 +77,7 @@ def _sorted_inbounds(inbounds: dict) -> List[Tuple]:
 
     index_dict = {
         proxy: index
-        for index, proxy in enumerate(xray.config.inbounds_by_tag.keys())
+        for index, proxy in enumerate(get_inbounds_by_tag().keys())
     }
     return sorted(resolved, key=lambda item: index_dict.get(item[1], float("inf")))
 
@@ -64,12 +87,13 @@ def iter_resolved_hosts(
         proxies: dict,
         format_variables: dict,
 ) -> Iterator[dict]:
+    available_inbounds_by_tag = get_inbounds_by_tag()
     for protocol, tag in _sorted_inbounds(inbounds):
         settings = proxies.get(protocol)
         if not settings:
             continue
 
-        inbound = xray.config.inbounds_by_tag.get(tag)
+        inbound = available_inbounds_by_tag.get(tag)
         if not inbound:
             continue
 
@@ -89,6 +113,63 @@ def iter_resolved_hosts(
                 "inbound_tag": tag,
             }
         )
+
+        if inbound["protocol"] == "hysteria2":
+            address = get_hysteria2_public_host()
+            port = get_hysteria2_public_port()
+            sni = get_hysteria2_server_name()
+            if not address or not port:
+                continue
+
+            current_variables = defaultdict(
+                base_variables.default_factory,
+                dict(base_variables),
+            )
+            current_variables.update(
+                {
+                    "ADDRESS": address,
+                    "address": address,
+                    "PORT": port,
+                    "port": port,
+                    "SNI": sni,
+                    "sni": sni,
+                    "HOST": "",
+                    "host": "",
+                    "PATH": "",
+                    "path": "",
+                }
+            )
+
+            remark_template = settings.config_name or "{name}"
+            settings_dump = settings.model_dump()
+            settings_dump["auth"] = build_userpass(
+                str(format_variables["username"]),
+                settings.password,
+            )
+            settings_dump["obfs_password"] = get_obfs_password()
+            settings_dump["pin_sha256"] = get_pin_sha256()
+            up_mbps, down_mbps = get_client_speed()
+            settings_dump["up_mbps"] = up_mbps
+            settings_dump["down_mbps"] = down_mbps
+
+            yield {
+                "tag": tag,
+                "remark": _render_name_template(remark_template, current_variables),
+                "address": address,
+                "inbound": {
+                    **inbound,
+                    "port": port,
+                    "sni": sni,
+                    "host": "",
+                    "path": "",
+                    "ais": inbound.get("allowinsecure", False),
+                    "obfs_password": get_obfs_password(),
+                    "hop_interval": get_port_hop_interval(),
+                },
+                "settings": settings_dump,
+                "format_variables": current_variables,
+            }
+            continue
 
         for host in xray.hosts.get(tag, []):
             current_variables = defaultdict(
@@ -164,11 +245,11 @@ def iter_resolved_hosts(
                 }
             )
 
-            remark_template = host["remark"] or "{COUNTRY} - {name}"
+            remark_template = settings.config_name or host["remark"] or "{name}"
 
             yield {
                 "tag": tag,
-                "remark": remark_template.format_map(current_variables),
+                "remark": _render_name_template(remark_template, current_variables),
                 "address": address.format_map(current_variables),
                 "inbound": host_inbound,
                 "settings": settings.model_dump(),
@@ -180,6 +261,36 @@ def generate_v2ray_links(proxies: dict, inbounds: dict, extra_data: dict, revers
     format_variables = setup_format_variables(extra_data)
     conf = V2rayShareLink()
     return process_inbounds_and_tags(inbounds, proxies, format_variables, conf=conf, reverse=reverse)
+
+
+def generate_hysteria2_subscription(
+        proxies: dict, inbounds: dict, extra_data: dict, reverse: bool
+) -> str:
+    format_variables = setup_format_variables(extra_data)
+    links = []
+
+    for entry in iter_resolved_hosts(inbounds, proxies, format_variables):
+        if entry["inbound"]["protocol"] != "hysteria2":
+            continue
+
+        link = build_hysteria2_uri(
+            username=extra_data.get("username", ""),
+            password=entry["settings"]["password"],
+            remark=entry["remark"],
+            server=entry["address"],
+            port=entry["inbound"]["port"],
+            sni=entry["inbound"].get("sni", ""),
+            insecure=bool(entry["inbound"].get("ais")),
+            obfs_password=entry["settings"].get("obfs_password", ""),
+            pin_sha256=entry["settings"].get("pin_sha256", ""),
+        )
+        if link:
+            links.append(link)
+
+    if reverse:
+        links.reverse()
+
+    return "\n".join(links)
 
 
 def generate_clash_subscription(
@@ -231,7 +342,7 @@ def generate_v2ray_json_subscription(
 
 def generate_subscription(
         user: "UserResponse",
-        config_format: Literal["v2ray", "clash-meta", "clash", "sing-box", "outline", "v2ray-json"],
+        config_format: Literal["v2ray", "clash-meta", "clash", "sing-box", "outline", "v2ray-json", "hysteria2"],
         as_base64: bool,
         reverse: bool,
 ) -> str:
@@ -254,6 +365,8 @@ def generate_subscription(
         config = generate_outline_subscription(**kwargs)
     elif config_format == "v2ray-json":
         config = generate_v2ray_json_subscription(**kwargs)
+    elif config_format == "hysteria2":
+        config = generate_hysteria2_subscription(**kwargs)
     else:
         raise ValueError(f'Unsupported format "{config_format}"')
 
@@ -282,6 +395,37 @@ def generate_manual_connections(
 
     for entry in iter_resolved_hosts(inbounds, proxies, format_variables):
         if entry["inbound"]["protocol"] != "mtproto":
+            if entry["inbound"]["protocol"] != "hysteria2":
+                continue
+
+            hy2_link = build_hysteria2_uri(
+                username=extra_data.get("username", ""),
+                password=entry["settings"]["password"],
+                remark=entry["remark"],
+                server=entry["address"],
+                port=entry["inbound"]["port"],
+                sni=entry["inbound"].get("sni", ""),
+                insecure=bool(entry["inbound"].get("ais")),
+                obfs_password=entry["settings"].get("obfs_password", ""),
+                pin_sha256=entry["settings"].get("pin_sha256", ""),
+            )
+
+            connections.append(
+                {
+                    "title": entry["remark"],
+                    "protocol": "HYSTERIA2",
+                    "server": entry["address"],
+                    "port": entry["inbound"]["port"],
+                    "auth": entry["settings"]["auth"],
+                    "username": extra_data.get("username", ""),
+                    "password": entry["settings"]["password"],
+                    "sni": entry["inbound"].get("sni", ""),
+                    "obfs_password": entry["settings"].get("obfs_password", ""),
+                    "insecure": bool(entry["inbound"].get("ais")),
+                    "pin_sha256": entry["settings"].get("pin_sha256", ""),
+                    "share_url": hy2_link,
+                }
+            )
             continue
 
         secret = entry["settings"]["secret"]
@@ -307,6 +451,10 @@ def generate_manual_connections(
             }
         )
 
+    standalone_mtproxy = build_mtproxy_manual_connection()
+    if standalone_mtproxy:
+        connections.append(standalone_mtproxy)
+
     return connections
 
 
@@ -329,7 +477,10 @@ def get_link_title(link: str, fallback: str = "") -> str:
 
 
 def get_link_protocol(link: str) -> str:
-    return link.split("://", 1)[0].upper()
+    protocol = link.split("://", 1)[0].lower()
+    if protocol == "hy2":
+        return "HYSTERIA2"
+    return protocol.upper()
 
 
 def build_subscription_page_context(user: "UserResponse", base_url: str) -> dict:
@@ -388,6 +539,16 @@ def build_subscription_page_context(user: "UserResponse", base_url: str) -> dict
             "format": "v2ray-json",
         },
     ]
+
+    if any(item["protocol"] == "HYSTERIA2" for item in manual_connections):
+        client_links.append(
+            {
+                "title": "Hysteria2",
+                "subtitle": "Direct hy2 links for Hysteria2 clients",
+                "url": f"{base_url}/hysteria2",
+                "format": "hysteria2",
+            }
+        )
 
     return {
         "user": user,

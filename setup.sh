@@ -28,6 +28,29 @@ APT_UPDATED=0
 NODE_MAJOR_REQUIRED="${NODE_MAJOR_REQUIRED:-18}"
 NODE_MAX_OLD_SPACE_SIZE="${NODE_MAX_OLD_SPACE_SIZE:-1536}"
 SETUPTOOLS_SPEC="${SETUPTOOLS_SPEC:-setuptools<81}"
+INSTALL_MTPROXY="${INSTALL_MTPROXY:-true}"
+MTPROXY_PORT="${MTPROXY_PORT:-8443}"
+MTPROXY_IMAGE="${MTPROXY_IMAGE:-arm64builds/mtproxy:latest}"
+MTPROXY_CONTAINER_NAME="${MTPROXY_CONTAINER_NAME:-mtproto-proxy}"
+MTPROXY_FAKE_TLS_DOMAIN="${MTPROXY_FAKE_TLS_DOMAIN:-cdnjs.cloudflare.com}"
+MTPROXY_PUBLIC_HOST_VALUE=""
+MTPROXY_INTERNAL_SECRET_VALUE="${MTPROXY_INTERNAL_SECRET_VALUE:-}"
+MTPROXY_PUBLIC_SECRET_VALUE=""
+INSTALL_HYSTERIA2="${INSTALL_HYSTERIA2:-true}"
+HYSTERIA2_PORT="${HYSTERIA2_PORT:-8443}"
+HYSTERIA2_SERVICE_NAME="${HYSTERIA2_SERVICE_NAME:-hysteria-server.service}"
+HYSTERIA2_CONFIG_FILE="${HYSTERIA2_CONFIG_FILE:-/etc/hysteria/config.yaml}"
+HYSTERIA2_CERT_DIR="${HYSTERIA2_CERT_DIR:-/etc/hysteria/certs}"
+HYSTERIA2_CERT_FILE="${HYSTERIA2_CERT_DIR}/server.crt"
+HYSTERIA2_KEY_FILE="${HYSTERIA2_CERT_DIR}/server.key"
+HYSTERIA2_PUBLIC_HOST_VALUE=""
+HYSTERIA2_SNI_VALUE=""
+HYSTERIA2_CERT_FILE_VALUE=""
+HYSTERIA2_KEY_FILE_VALUE=""
+HYSTERIA2_INSECURE_VALUE="False"
+HYSTERIA2_PIN_SHA256_VALUE=""
+HYSTERIA2_OBFS_PASSWORD_VALUE=""
+HYSTERIA2_AUTH_SECRET_VALUE=""
 
 usage() {
     cat <<EOF
@@ -45,6 +68,11 @@ Options:
   --repo URL                  Git repository URL
   --branch main               Git branch
   --port 8000                 Local uvicorn port behind nginx
+  --mtproxy-port 8443         TCP port for standalone MTProxy with Fake TLS
+  --mtproxy-domain host       Fake TLS domain for MTProxy
+  --disable-mtproxy           Skip MTProxy installation/configuration
+  --hysteria2-port 8443       UDP port for Hysteria2
+  --disable-hysteria2         Skip Hysteria2 installation/configuration
   --no-node                   Skip node/npm installation and dashboard rebuild
   --help                      Show this help
 EOF
@@ -113,6 +141,26 @@ parse_args() {
                 UVICORN_PORT="${2:-}"
                 shift 2
                 ;;
+            --mtproxy-port)
+                MTPROXY_PORT="${2:-}"
+                shift 2
+                ;;
+            --mtproxy-domain)
+                MTPROXY_FAKE_TLS_DOMAIN="${2:-}"
+                shift 2
+                ;;
+            --disable-mtproxy)
+                INSTALL_MTPROXY=false
+                shift
+                ;;
+            --hysteria2-port)
+                HYSTERIA2_PORT="${2:-}"
+                shift 2
+                ;;
+            --disable-hysteria2)
+                INSTALL_HYSTERIA2=false
+                shift
+                ;;
             --no-node)
                 INSTALL_NODE=false
                 shift
@@ -167,6 +215,14 @@ apt_install() {
     apt-get install -y --no-install-recommends "$@"
 }
 
+is_ipv4_address() {
+    [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+}
+
+hex_encode() {
+    printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n'
+}
+
 repair_package_manager() {
     log "repairing dpkg/apt state"
     dpkg --configure -a || true
@@ -205,6 +261,16 @@ ensure_nodejs() {
     log "installed Node.js $(node -v) and npm $(npm -v)"
 }
 
+install_docker() {
+    if [[ "$INSTALL_MTPROXY" != "true" ]]; then
+        return
+    fi
+
+    log "installing Docker for standalone MTProxy"
+    apt_install docker.io
+    systemctl enable --now docker
+}
+
 create_user_if_missing() {
     if ! id -u "$APP_USER" >/dev/null 2>&1; then
         log "creating system user $APP_USER"
@@ -234,6 +300,15 @@ clone_or_update_repo() {
 install_xray() {
     log "installing/updating Xray"
     bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+}
+
+install_hysteria2_binary() {
+    if [[ "$INSTALL_HYSTERIA2" != "true" ]]; then
+        return
+    fi
+
+    log "installing/updating Hysteria2"
+    bash -c "$(curl -fsSL https://get.hy2.sh/)"
 }
 
 set_env_value() {
@@ -297,6 +372,126 @@ configure_env() {
     set_env_value "XRAY_ASSETS_PATH" "/usr/local/share/xray"
     set_env_value "XRAY_SUBSCRIPTION_URL_PREFIX" "\"${subscription_prefix}\""
     set_env_value "ALLOWED_ORIGINS" "\"${allowed_origins}\""
+
+    chown "$APP_USER:$APP_GROUP" "$APP_DIR/.env"
+}
+
+configure_mtproxy_env() {
+    local host domain_hex
+
+    if [[ "$INSTALL_MTPROXY" != "true" ]]; then
+        set_env_value "MTPROXY_ENABLED" "False"
+        return
+    fi
+
+    host="${DOMAIN:-$PUBLIC_HOST}"
+    [[ -n "$host" ]] || die "unable to determine host for MTProxy"
+
+    MTPROXY_PUBLIC_HOST_VALUE="$host"
+    MTPROXY_FAKE_TLS_DOMAIN="${MTPROXY_FAKE_TLS_DOMAIN:-cdnjs.cloudflare.com}"
+    MTPROXY_INTERNAL_SECRET_VALUE="${MTPROXY_INTERNAL_SECRET_VALUE:-$(openssl rand -hex 16)}"
+    MTPROXY_INTERNAL_SECRET_VALUE="$(printf '%s' "$MTPROXY_INTERNAL_SECRET_VALUE" | tr '[:upper:]' '[:lower:]')"
+    domain_hex="$(hex_encode "$MTPROXY_FAKE_TLS_DOMAIN")"
+    [[ -n "$domain_hex" ]] || die "unable to generate MTProxy Fake TLS domain hex"
+    MTPROXY_PUBLIC_SECRET_VALUE="ee${MTPROXY_INTERNAL_SECRET_VALUE}${domain_hex}"
+
+    set_env_value "MTPROXY_ENABLED" "True"
+    set_env_value "MTPROXY_NAME" "Telegram Proxy"
+    set_env_value "MTPROXY_PUBLIC_HOST" "$MTPROXY_PUBLIC_HOST_VALUE"
+    set_env_value "MTPROXY_PORT" "$MTPROXY_PORT"
+    set_env_value "MTPROXY_SECRET" "$MTPROXY_PUBLIC_SECRET_VALUE"
+    set_env_value "MTPROXY_RAW_SECRET" "$MTPROXY_INTERNAL_SECRET_VALUE"
+    set_env_value "MTPROXY_FAKE_TLS_DOMAIN" "$MTPROXY_FAKE_TLS_DOMAIN"
+
+    chown "$APP_USER:$APP_GROUP" "$APP_DIR/.env"
+}
+
+install_mtproxy() {
+    if [[ "$INSTALL_MTPROXY" != "true" ]]; then
+        return
+    fi
+
+    log "starting standalone MTProxy on TCP ${MTPROXY_PORT}"
+    bash "$APP_DIR/start-mtproxy.sh" \
+        --host "$MTPROXY_PUBLIC_HOST_VALUE" \
+        --port "$MTPROXY_PORT" \
+        --domain "$MTPROXY_FAKE_TLS_DOMAIN" \
+        --container-name "$MTPROXY_CONTAINER_NAME" \
+        --image "$MTPROXY_IMAGE" \
+        --raw-secret "$MTPROXY_INTERNAL_SECRET_VALUE" \
+        --output "$APP_DIR/mtproxy_config.txt"
+
+    chown "$APP_USER:$APP_GROUP" "$APP_DIR/mtproxy_config.txt"
+}
+
+compute_hysteria2_pin() {
+    local cert_file="$1"
+    openssl x509 -in "$cert_file" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d '\r\n'
+}
+
+generate_hysteria2_self_signed_cert() {
+    local host="$1"
+    local san
+
+    install -d -m 0755 "$HYSTERIA2_CERT_DIR"
+
+    if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        san="IP:${host}"
+    else
+        san="DNS:${host}"
+    fi
+
+    log "generating self-signed certificate for Hysteria2 (${host})"
+    openssl req -x509 -nodes -newkey rsa:2048 \
+        -keyout "$HYSTERIA2_KEY_FILE" \
+        -out "$HYSTERIA2_CERT_FILE" \
+        -days 3650 \
+        -subj "/CN=${host}" \
+        -addext "subjectAltName = ${san}" >/dev/null 2>&1
+}
+
+configure_hysteria2_env() {
+    local host letsencrypt_dir
+
+    if [[ "$INSTALL_HYSTERIA2" != "true" ]]; then
+        set_env_value "HYSTERIA2_ENABLED" "False"
+        return
+    fi
+
+    host="${DOMAIN:-$PUBLIC_HOST}"
+    [[ -n "$host" ]] || die "unable to determine host for Hysteria2"
+
+    HYSTERIA2_PUBLIC_HOST_VALUE="$host"
+    HYSTERIA2_SNI_VALUE="$host"
+
+    letsencrypt_dir="/etc/letsencrypt/live/${DOMAIN}"
+    if [[ -n "$DOMAIN" && -f "${letsencrypt_dir}/fullchain.pem" && -f "${letsencrypt_dir}/privkey.pem" ]]; then
+        HYSTERIA2_CERT_FILE_VALUE="${letsencrypt_dir}/fullchain.pem"
+        HYSTERIA2_KEY_FILE_VALUE="${letsencrypt_dir}/privkey.pem"
+        HYSTERIA2_INSECURE_VALUE="False"
+    else
+        generate_hysteria2_self_signed_cert "$host"
+        HYSTERIA2_CERT_FILE_VALUE="$HYSTERIA2_CERT_FILE"
+        HYSTERIA2_KEY_FILE_VALUE="$HYSTERIA2_KEY_FILE"
+        HYSTERIA2_INSECURE_VALUE="True"
+    fi
+
+    HYSTERIA2_PIN_SHA256_VALUE="$(compute_hysteria2_pin "$HYSTERIA2_CERT_FILE_VALUE")"
+    HYSTERIA2_OBFS_PASSWORD_VALUE="${HYSTERIA2_OBFS_PASSWORD_VALUE:-$(random_password)}"
+    HYSTERIA2_AUTH_SECRET_VALUE="${HYSTERIA2_AUTH_SECRET_VALUE:-$(openssl rand -hex 16)}"
+
+    set_env_value "HYSTERIA2_ENABLED" "True"
+    set_env_value "HYSTERIA2_PUBLIC_HOST" "$HYSTERIA2_PUBLIC_HOST_VALUE"
+    set_env_value "HYSTERIA2_PORT" "$HYSTERIA2_PORT"
+    set_env_value "HYSTERIA2_SNI" "$HYSTERIA2_SNI_VALUE"
+    set_env_value "HYSTERIA2_INSECURE" "$HYSTERIA2_INSECURE_VALUE"
+    set_env_value "HYSTERIA2_PIN_SHA256" "$HYSTERIA2_PIN_SHA256_VALUE"
+    set_env_value "HYSTERIA2_OBFS_PASSWORD" "$HYSTERIA2_OBFS_PASSWORD_VALUE"
+    set_env_value "HYSTERIA2_AUTH_SECRET" "$HYSTERIA2_AUTH_SECRET_VALUE"
+    set_env_value "HYSTERIA2_TLS_CERT" "$HYSTERIA2_CERT_FILE_VALUE"
+    set_env_value "HYSTERIA2_TLS_KEY" "$HYSTERIA2_KEY_FILE_VALUE"
+    set_env_value "HYSTERIA2_CLIENT_UP_Mbps" "100"
+    set_env_value "HYSTERIA2_CLIENT_DOWN_Mbps" "100"
 
     chown "$APP_USER:$APP_GROUP" "$APP_DIR/.env"
 }
@@ -411,6 +606,79 @@ maybe_enable_ssl() {
     certbot --nginx --non-interactive --agree-tos -m "$EMAIL" -d "$DOMAIN" --redirect
 }
 
+write_hysteria2_config() {
+    if [[ "$INSTALL_HYSTERIA2" != "true" ]]; then
+        return
+    fi
+
+    log "writing Hysteria2 config ${HYSTERIA2_CONFIG_FILE}"
+    install -d -m 0755 "$(dirname "$HYSTERIA2_CONFIG_FILE")" "$HYSTERIA2_CERT_DIR"
+
+    cat >"$HYSTERIA2_CONFIG_FILE" <<EOF
+listen: :${HYSTERIA2_PORT}
+
+tls:
+  cert: ${HYSTERIA2_CERT_FILE_VALUE}
+  key: ${HYSTERIA2_KEY_FILE_VALUE}
+
+auth:
+  type: http
+  http:
+    url: http://127.0.0.1:${UVICORN_PORT}/api/hysteria2/${HYSTERIA2_AUTH_SECRET_VALUE}/auth
+
+masquerade:
+  type: string
+  string:
+    content: "404 page not found"
+    statusCode: 404
+
+bandwidth:
+  up: 1 gbps
+  down: 1 gbps
+
+ignoreClientBandwidth: false
+udpIdleTimeout: 120s
+
+quic:
+  initStreamReceiveWindow: 26843545
+  maxStreamReceiveWindow: 26843545
+  initConnReceiveWindow: 67108864
+  maxConnReceiveWindow: 67108864
+EOF
+
+    if [[ -n "$HYSTERIA2_OBFS_PASSWORD_VALUE" ]]; then
+        cat >>"$HYSTERIA2_CONFIG_FILE" <<EOF
+
+obfs:
+  type: salamander
+  salamander:
+    password: ${HYSTERIA2_OBFS_PASSWORD_VALUE}
+EOF
+    fi
+}
+
+write_hysteria2_sysctl() {
+    if [[ "$INSTALL_HYSTERIA2" != "true" ]]; then
+        return
+    fi
+
+    log "applying UDP buffer tuning for Hysteria2"
+    cat >/etc/sysctl.d/99-hysteria2.conf <<EOF
+net.core.rmem_max=16777216
+net.core.wmem_max=16777216
+EOF
+    sysctl --system >/dev/null
+}
+
+enable_hysteria2_service() {
+    if [[ "$INSTALL_HYSTERIA2" != "true" ]]; then
+        return
+    fi
+
+    systemctl enable --now "$HYSTERIA2_SERVICE_NAME"
+    systemctl restart "$HYSTERIA2_SERVICE_NAME"
+}
+
 print_summary() {
     local protocol host
     protocol="http"
@@ -431,12 +699,27 @@ Service:    $SERVICE_NAME
 Dashboard:  ${protocol}://${host}/dashboard/
 Admin user: $ADMIN_USERNAME
 Admin pass: $ADMIN_PASSWORD
-
 Useful commands:
   systemctl status $SERVICE_NAME
   journalctl -u $SERVICE_NAME -f
   nginx -t
 EOF
+
+    if [[ "$INSTALL_MTPROXY" == "true" ]]; then
+        cat <<EOF
+MTProxy:    tg://proxy?server=${MTPROXY_PUBLIC_HOST_VALUE}&port=${MTPROXY_PORT}&secret=${MTPROXY_PUBLIC_SECRET_VALUE} (TCP)
+  Fake TLS: ${MTPROXY_FAKE_TLS_DOMAIN}
+  docker logs --tail 20 ${MTPROXY_CONTAINER_NAME}
+EOF
+    fi
+
+    if [[ "$INSTALL_HYSTERIA2" == "true" ]]; then
+        cat <<EOF
+Hysteria2:  hy2://${host}:${HYSTERIA2_PORT} (UDP)
+  systemctl status $HYSTERIA2_SERVICE_NAME
+  journalctl -u $HYSTERIA2_SERVICE_NAME -f
+EOF
+    fi
 }
 
 main() {
@@ -461,17 +744,26 @@ main() {
     fi
 
     ensure_nodejs
+    install_docker
 
     create_user_if_missing
     clone_or_update_repo
     install_xray
     configure_env
+    configure_mtproxy_env
+    install_mtproxy
     install_python_app
     build_dashboard
     run_migrations
     write_systemd_unit
     write_nginx_config
     maybe_enable_ssl
+    install_hysteria2_binary
+    configure_hysteria2_env
+    systemctl restart "$SERVICE_NAME"
+    write_hysteria2_config
+    write_hysteria2_sysctl
+    enable_hysteria2_service
     print_summary
 }
 

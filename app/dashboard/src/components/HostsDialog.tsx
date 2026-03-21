@@ -349,7 +349,7 @@ const AccordionInbound: FC<AccordionInboundType> = ({
                                       </Badge>{" "}
                                       {t("hostsDialog.country", {
                                         defaultValue:
-                                          "Country name for the config",
+                                          "Inbound label",
                                       })}
                                     </Text>
                                     <Text mt={1}>

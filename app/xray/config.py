@@ -426,6 +426,14 @@ class XRayConfig(dict):
                         if excluded_inbound_tags and inbound['tag'] in excluded_inbound_tags:
                             continue
 
+                        try:
+                            settings = ProxyTypes(proxy_type).settings_model.model_validate(settings).account_dump()
+                        except Exception:
+                            settings = {
+                                key: value for key, value in settings.items()
+                                if key != "config_name"
+                            }
+
                         client = {
                             "email": f"{user_id}.{username}",
                             **settings

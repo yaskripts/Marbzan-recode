@@ -118,11 +118,16 @@ const getDefaultValues = (): FormType => {
     note: "",
     inbounds,
     proxies: {
-      vless: { id: "", flow: "" },
-      vmess: { id: "" },
-      trojan: { password: "" },
-      shadowsocks: { password: "", method: "chacha20-ietf-poly1305" },
-      mtproto: { secret: "" },
+      vless: { id: "", flow: "", config_name: "" },
+      vmess: { id: "", config_name: "" },
+      trojan: { password: "", config_name: "" },
+      shadowsocks: {
+        password: "",
+        method: "chacha20-ietf-poly1305",
+        config_name: "",
+      },
+      mtproto: { secret: "", config_name: "" },
+      hysteria2: { password: "", config_name: "" },
     },
   };
 };
@@ -164,6 +169,13 @@ const baseSchema = {
       deleteIfEmpty(ins.shadowsocks, "password");
       deleteIfEmpty(ins.shadowsocks, "method");
       deleteIfEmpty(ins.mtproto, "secret");
+      deleteIfEmpty(ins.hysteria2, "password");
+      deleteIfEmpty(ins.vmess, "config_name");
+      deleteIfEmpty(ins.vless, "config_name");
+      deleteIfEmpty(ins.trojan, "config_name");
+      deleteIfEmpty(ins.shadowsocks, "config_name");
+      deleteIfEmpty(ins.mtproto, "config_name");
+      deleteIfEmpty(ins.hysteria2, "config_name");
       return ins;
     }),
   data_limit: z
@@ -751,6 +763,13 @@ export const UserDialog: FC<UserDialogProps> = () => {
                                 title: "mtproto",
                                 description: t("userDialog.mtprotoDesc", {
                                   defaultValue: "Telegram MTProto proxy",
+                                }),
+                              },
+                              {
+                                title: "hysteria2",
+                                description: t("userDialog.hysteria2Desc", {
+                                  defaultValue:
+                                    "High-performance QUIC transport with external Hysteria2 auth",
                                 }),
                               },
                             ]}

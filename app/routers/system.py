@@ -8,6 +8,7 @@ from app.models.admin import Admin
 from app.models.proxy import ProxyHost, ProxyInbound, ProxyTypes
 from app.models.system import SystemStats
 from app.models.user import UserStatus
+from app.protocols import get_inbounds_by_protocol
 from app.utils import responses
 from app.utils.system import cpu_usage, memory_usage, realtime_bandwidth
 
@@ -66,7 +67,7 @@ def get_system_stats(
 @router.get("/inbounds", response_model=Dict[ProxyTypes, List[ProxyInbound]])
 def get_inbounds(admin: Admin = Depends(Admin.get_current)):
     """Retrieve inbound configurations grouped by protocol."""
-    return xray.config.inbounds_by_protocol
+    return get_inbounds_by_protocol()
 
 
 @router.get(

@@ -20,7 +20,6 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import select, text
 
-from app import xray
 from app.db.base import Base
 from app.models.node import NodeStatus
 from app.models.proxy import (
@@ -30,6 +29,7 @@ from app.models.proxy import (
     ProxyTypes,
 )
 from app.models.user import ReminderType, UserDataLimitResetStrategy, UserStatus
+from app.protocols import get_inbounds_by_protocol
 
 
 class Admin(Base):
@@ -135,10 +135,11 @@ class User(Base):
     @property
     def inbounds(self):
         _ = {}
+        available_inbounds = get_inbounds_by_protocol()
         for proxy in self.proxies:
             _[proxy.type] = []
             excluded_tags = [i.tag for i in proxy.excluded_inbounds]
-            for inbound in xray.config.inbounds_by_protocol.get(proxy.type, []):
+            for inbound in available_inbounds.get(proxy.type, []):
                 if inbound["tag"] not in excluded_tags:
                     _[proxy.type].append(inbound["tag"])
 

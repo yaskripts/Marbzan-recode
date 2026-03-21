@@ -155,6 +155,17 @@ class V2rayShareLink(str):
                 password=settings["password"],
                 method=settings["method"],
             )
+        elif inbound["protocol"] == "hysteria2":
+            link = self.hysteria2(
+                remark=remark,
+                address=address,
+                port=inbound["port"],
+                auth=settings["auth"],
+                sni=inbound.get("sni", ""),
+                insecure=bool(inbound.get("ais")),
+                obfs_password=settings.get("obfs_password", ""),
+                pin_sha256=settings.get("pin_sha256", ""),
+            )
         else:
             return
 
@@ -482,6 +493,41 @@ class V2rayShareLink(str):
             "ss://"
             + base64.b64encode(f"{method}:{password}".encode()).decode()
             + f"@{address}:{port}#{urlparse.quote(remark)}"
+        )
+
+    @classmethod
+    def hysteria2(
+            cls,
+            remark: str,
+            address: str,
+            port: Union[str, int],
+            auth: str,
+            sni: str = "",
+            insecure: bool = False,
+            obfs_password: str = "",
+            pin_sha256: str = "",
+    ):
+        if ":" in address and not address.startswith("["):
+            address = f"[{address}]"
+
+        params = {}
+        if sni:
+            params["sni"] = sni
+        if obfs_password:
+            params["obfs"] = "salamander"
+            params["obfs-password"] = obfs_password
+        if insecure:
+            params["insecure"] = "1"
+        if pin_sha256:
+            params["pinSHA256"] = pin_sha256
+
+        query = urlparse.urlencode(params)
+        query_part = f"?{query}" if query else ""
+        return (
+            "hy2://"
+            + f"{urlparse.quote(auth, safe=':')}@{address}:{port}/"
+            + query_part
+            + f"#{urlparse.quote(remark)}"
         )
 
 

@@ -17,6 +17,7 @@ from app.models.user import (
     UsersUsagesResponse,
     UserUsagesResponse,
 )
+from app.protocols import is_protocol_enabled
 from app.utils import report, responses
 
 router = APIRouter(tags=["User"], prefix="/api", responses={401: responses._401})
@@ -48,7 +49,7 @@ def add_user(
     # TODO expire should be datetime instead of timestamp
 
     for proxy_type in new_user.proxies:
-        if not xray.config.inbounds_by_protocol.get(proxy_type):
+        if not is_protocol_enabled(proxy_type):
             raise HTTPException(
                 status_code=400,
                 detail=f"Protocol {proxy_type} is disabled on your server",
@@ -102,7 +103,7 @@ def modify_user(
     """
 
     for proxy_type in modified_user.proxies:
-        if not xray.config.inbounds_by_protocol.get(proxy_type):
+        if not is_protocol_enabled(proxy_type):
             raise HTTPException(
                 status_code=400,
                 detail=f"Protocol {proxy_type} is disabled on your server",

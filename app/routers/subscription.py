@@ -32,6 +32,7 @@ client_config = {
     "clash": {"config_format": "clash", "media_type": "text/yaml", "as_base64": False, "reverse": False},
     "v2ray": {"config_format": "v2ray", "media_type": "text/plain", "as_base64": True, "reverse": False},
     "outline": {"config_format": "outline", "media_type": "application/json", "as_base64": False, "reverse": False},
+    "hysteria2": {"config_format": "hysteria2", "media_type": "text/plain", "as_base64": False, "reverse": False},
     "v2ray-json": {"config_format": "v2ray-json", "media_type": "application/json", "as_base64": False,
                    "reverse": False}
 }
@@ -174,7 +175,7 @@ def user_get_usage(
 def user_subscription_with_client_type(
     request: Request,
     dbuser: UserResponse = Depends(get_validated_sub),
-    client_type: str = Path(..., regex="sing-box|clash-meta|clash|outline|v2ray|v2ray-json"),
+    client_type: str = Path(..., regex="sing-box|clash-meta|clash|outline|v2ray|v2ray-json|hysteria2"),
     db: Session = Depends(get_db),
     user_agent: str = Header(default="")
 ):

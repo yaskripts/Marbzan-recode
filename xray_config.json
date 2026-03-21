@@ -7,7 +7,7 @@
       {
         "type": "field",
         "inboundTag": [
-          "Telegram"
+          "MTPROTO"
         ],
         "outboundTag": "TELEGRAM_MTPROTO"
       },
@@ -22,7 +22,7 @@
   },
   "inbounds": [
     {
-      "tag": "Poland",
+      "tag": "VLESS TCP",
       "listen": "0.0.0.0",
       "port": 10000,
       "protocol": "vless",
@@ -40,17 +40,18 @@
       }
     },
     {
-      "tag": "Germany",
+      "tag": "VLESS WS",
       "listen": "0.0.0.0",
       "port": 10001,
-      "protocol": "vmess",
+      "protocol": "vless",
       "settings": {
-        "clients": []
+        "clients": [],
+        "decryption": "none"
       },
       "streamSettings": {
         "network": "ws",
         "wsSettings": {
-          "path": "/germany-vmess"
+          "path": "/vless"
         }
       },
       "sniffing": {
@@ -62,24 +63,29 @@
       }
     },
     {
-      "tag": "Netherlands",
+      "tag": "VMESS WS",
       "listen": "0.0.0.0",
       "port": 10002,
-      "protocol": "trojan",
+      "protocol": "vmess",
       "settings": {
         "clients": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/vmess"
+        }
       },
       "sniffing": {
         "enabled": true,
         "destOverride": [
           "http",
-          "tls",
-          "quic"
+          "tls"
         ]
       }
     },
     {
-      "tag": "France",
+      "tag": "SHADOWSOCKS TCP",
       "listen": "0.0.0.0",
       "port": 10003,
       "protocol": "shadowsocks",
@@ -89,7 +95,7 @@
       }
     },
     {
-      "tag": "Telegram",
+      "tag": "MTPROTO",
       "listen": "0.0.0.0",
       "port": 3443,
       "protocol": "mtproto",

@@ -49,10 +49,10 @@ class SingBoxConfiguration(str):
         self.config["outbounds"].append(outbound_data)
 
     def render(self, reverse=False):
-        urltest_types = ["vmess", "vless", "trojan", "shadowsocks"]
+        urltest_types = ["vmess", "vless", "trojan", "shadowsocks", "hysteria2"]
         urltest_tags = [outbound["tag"]
                         for outbound in self.config["outbounds"] if outbound["type"] in urltest_types]
-        selector_types = ["vmess", "vless", "trojan", "shadowsocks", "urltest"]
+        selector_types = ["vmess", "vless", "trojan", "shadowsocks", "hysteria2", "urltest"]
         selector_tags = [outbound["tag"]
                          for outbound in self.config["outbounds"] if outbound["type"] in selector_types]
 
@@ -288,7 +288,7 @@ class SingBoxConfiguration(str):
         net = inbound["network"]
         path = inbound["path"]
 
-        if inbound["protocol"] not in ("vmess", "vless", "trojan", "shadowsocks"):
+        if inbound["protocol"] not in ("vmess", "vless", "trojan", "shadowsocks", "hysteria2"):
             return
 
         # not supported by sing-box
@@ -302,6 +302,43 @@ class SingBoxConfiguration(str):
 
         remark = self._remark_validation(remark)
         self.proxy_remarks.append(remark)
+
+        if inbound["protocol"] == "hysteria2":
+            outbound = {
+                "type": "hysteria2",
+                "tag": remark,
+                "server": address,
+                "password": settings["auth"],
+                "tls": {
+                    "enabled": True,
+                },
+            }
+
+            port = inbound["port"]
+            if isinstance(port, str) and any(char in port for char in ",-"):
+                segments = [segment.strip() for segment in port.split(",") if segment.strip()]
+                outbound["server_ports"] = [segment.replace("-", ":") for segment in segments]
+                outbound["server_port"] = int(segments[0].split("-")[0])
+                outbound["hop_interval"] = inbound.get("hop_interval", "30s")
+            else:
+                outbound["server_port"] = int(port)
+
+            if inbound.get("sni"):
+                outbound["tls"]["server_name"] = inbound["sni"]
+            if inbound.get("ais"):
+                outbound["tls"]["insecure"] = True
+            if settings.get("obfs_password"):
+                outbound["obfs"] = {
+                    "type": "salamander",
+                    "password": settings["obfs_password"],
+                }
+            if settings.get("up_mbps"):
+                outbound["up_mbps"] = settings["up_mbps"]
+            if settings.get("down_mbps"):
+                outbound["down_mbps"] = settings["down_mbps"]
+
+            self.add_outbound(outbound)
+            return
 
         outbound = self.make_outbound(
             remark=remark,

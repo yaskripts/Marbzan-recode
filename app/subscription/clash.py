@@ -351,6 +351,40 @@ class ClashMetaConfiguration(ClashConfiguration):
 
         proxy_remark = self._remark_validation(remark)
 
+        if inbound["protocol"] == "hysteria2":
+            node = {
+                "name": proxy_remark,
+                "type": "hysteria2",
+                "server": address,
+                "udp": True,
+                "password": settings["auth"],
+            }
+
+            port = inbound["port"]
+            if isinstance(port, str) and any(char in port for char in ",-"):
+                node["ports"] = port
+                first_port = port.split(",")[0].split("-")[0].strip()
+                node["port"] = int(first_port)
+                node["hop-interval"] = inbound.get("hop_interval", "30s")
+            else:
+                node["port"] = int(port)
+
+            if inbound.get("sni"):
+                node["sni"] = inbound["sni"]
+            if inbound.get("ais"):
+                node["skip-cert-verify"] = True
+            if settings.get("obfs_password"):
+                node["obfs"] = "salamander"
+                node["obfs-password"] = settings["obfs_password"]
+            if settings.get("up_mbps"):
+                node["up"] = f"{settings['up_mbps']} Mbps"
+            if settings.get("down_mbps"):
+                node["down"] = f"{settings['down_mbps']} Mbps"
+
+            self.data["proxies"].append(node)
+            self.proxy_remarks.append(proxy_remark)
+            return
+
         node = self.make_node(
             name=remark,
             remark=proxy_remark,

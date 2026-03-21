@@ -8,25 +8,34 @@ export type Status =
   | "connecting"
   | "connected";
 export type ProxyKeys = (
-  "vmess" | "vless" | "trojan" | "shadowsocks" | "mtproto"
+  "vmess" | "vless" | "trojan" | "shadowsocks" | "mtproto" | "hysteria2"
 )[];
 export type ProxyType = {
   vmess?: {
     id?: string;
+    config_name?: string;
   };
   vless?: {
     id?: string;
     flow?: string;
+    config_name?: string;
   };
   trojan?: {
     password?: string;
+    config_name?: string;
   };
   shadowsocks?: {
     password?: string;
     method?: string;
+    config_name?: string;
   };
   mtproto?: {
     secret?: string;
+    config_name?: string;
+  };
+  hysteria2?: {
+    password?: string;
+    config_name?: string;
   };
 };
 

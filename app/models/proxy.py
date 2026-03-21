@@ -33,6 +33,7 @@ class ProxyTypes(str, Enum):
     Trojan = "trojan"
     Shadowsocks = "shadowsocks"
     MTProto = "mtproto"
+    Hysteria2 = "hysteria2"
 
     @property
     def account_model(self):
@@ -46,6 +47,8 @@ class ProxyTypes(str, Enum):
             return ShadowsocksAccount
         if self == self.MTProto:
             return MTProtoAccount
+        if self == self.Hysteria2:
+            return None
 
     @property
     def settings_model(self):
@@ -59,17 +62,26 @@ class ProxyTypes(str, Enum):
             return ShadowsocksSettings
         if self == self.MTProto:
             return MTProtoSettings
+        if self == self.Hysteria2:
+            return Hysteria2Settings
 
 
 class ProxySettings(BaseModel, use_enum_values=True):
+    config_name: Optional[str] = None
+
     @classmethod
     def from_dict(cls, proxy_type: ProxyTypes, _dict: dict):
         return ProxyTypes(proxy_type).settings_model.model_validate(_dict)
 
     def dict(self, *, no_obj=False, **kwargs):
         if no_obj:
-            return json.loads(self.json())
-        return super().dict(**kwargs)
+            return json.loads(self.model_dump_json(**kwargs))
+        return self.model_dump(**kwargs)
+
+    def account_dump(self, **kwargs):
+        return json.loads(
+            self.model_dump_json(exclude={"config_name"}, **kwargs)
+        )
 
 
 class VMessSettings(ProxySettings):
@@ -123,6 +135,13 @@ class MTProtoSettings(ProxySettings):
 
     def revoke(self):
         self.secret = secrets.token_hex(16)
+
+
+class Hysteria2Settings(ProxySettings):
+    password: str = Field(default_factory=random_password)
+
+    def revoke(self):
+        self.password = random_password()
 
 
 class ProxyHostSecurity(str, Enum):

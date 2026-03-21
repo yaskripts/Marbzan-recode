@@ -35,6 +35,30 @@ XRAY_EXCLUDE_INBOUND_TAGS = config("XRAY_EXCLUDE_INBOUND_TAGS", default='').spli
 XRAY_SUBSCRIPTION_URL_PREFIX = config("XRAY_SUBSCRIPTION_URL_PREFIX", default="").strip("/")
 XRAY_SUBSCRIPTION_PATH = config("XRAY_SUBSCRIPTION_PATH", default="sub").strip("/")
 
+MTPROXY_ENABLED = config("MTPROXY_ENABLED", default=False, cast=bool)
+MTPROXY_NAME = config("MTPROXY_NAME", default="Telegram Proxy")
+MTPROXY_PUBLIC_HOST = config("MTPROXY_PUBLIC_HOST", default="")
+MTPROXY_PORT = config("MTPROXY_PORT", cast=int, default=8443)
+MTPROXY_SECRET = config("MTPROXY_SECRET", default="")
+MTPROXY_RAW_SECRET = config("MTPROXY_RAW_SECRET", default="")
+MTPROXY_FAKE_TLS_DOMAIN = config("MTPROXY_FAKE_TLS_DOMAIN", default="")
+
+HYSTERIA2_ENABLED = config("HYSTERIA2_ENABLED", default=False, cast=bool)
+HYSTERIA2_TAG = config("HYSTERIA2_TAG", default="HYSTERIA2")
+HYSTERIA2_PUBLIC_HOST = config("HYSTERIA2_PUBLIC_HOST", default="")
+HYSTERIA2_PORT = config("HYSTERIA2_PORT", cast=int, default=8443)
+HYSTERIA2_PORTS = config("HYSTERIA2_PORTS", default="")
+HYSTERIA2_HOP_INTERVAL = config("HYSTERIA2_HOP_INTERVAL", default="30s")
+HYSTERIA2_SNI = config("HYSTERIA2_SNI", default="")
+HYSTERIA2_INSECURE = config("HYSTERIA2_INSECURE", default=False, cast=bool)
+HYSTERIA2_PIN_SHA256 = config("HYSTERIA2_PIN_SHA256", default="")
+HYSTERIA2_OBFS_PASSWORD = config("HYSTERIA2_OBFS_PASSWORD", default="")
+HYSTERIA2_AUTH_SECRET = config("HYSTERIA2_AUTH_SECRET", default="")
+HYSTERIA2_TLS_CERT = config("HYSTERIA2_TLS_CERT", default="")
+HYSTERIA2_TLS_KEY = config("HYSTERIA2_TLS_KEY", default="")
+HYSTERIA2_CLIENT_UP_Mbps = config("HYSTERIA2_CLIENT_UP_Mbps", cast=int, default=100)
+HYSTERIA2_CLIENT_DOWN_Mbps = config("HYSTERIA2_CLIENT_DOWN_Mbps", cast=int, default=100)
+
 TELEGRAM_API_TOKEN = config("TELEGRAM_API_TOKEN", default="")
 TELEGRAM_ADMIN_ID = config(
     'TELEGRAM_ADMIN_ID',

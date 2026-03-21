@@ -8,6 +8,7 @@ import {
   chakra,
   Checkbox,
   FormControl,
+  FormHelperText,
   HStack,
   IconButton,
   Input,
@@ -19,7 +20,7 @@ import {
   UseRadioProps,
   VStack,
 } from "@chakra-ui/react";
-import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { shadowsocksMethods, XTLSFlows } from "constants/Proxies";
 import {
   InboundType,
@@ -34,7 +35,7 @@ import {
   useWatch,
 } from "react-hook-form";
 
-const SettingsIcon = chakra(EllipsisVerticalIcon, {
+const SettingsIcon = chakra(Cog6ToothIcon, {
   baseStyle: {
     strokeWidth: "2px",
     w: 5,
@@ -320,6 +321,34 @@ const RadioCard: FC<
           pt={1.5}
           _dark={{ bg: "gray.700" }}
         >
+          {isSelected && (
+            <VStack alignItems="flex-start" w="full">
+              <FormControl>
+                <Text fontSize="sm" pb={1}>
+                  {t("userDialog.configName", {
+                    defaultValue: "Config name",
+                  })}
+                </Text>
+                <Input
+                  fontSize="xs"
+                  size="sm"
+                  borderRadius="6px"
+                  pl={2}
+                  pr={2}
+                  placeholder={t("userDialog.configNamePlaceholder", {
+                    defaultValue: "Leave empty to use the host name",
+                  })}
+                  {...form.register(`proxies.${title}.config_name`)}
+                />
+                <FormHelperText fontSize="xs">
+                  {t("userDialog.configNameHelp", {
+                    defaultValue:
+                      "Supports templates like {name}, {USERNAME}, {INBOUND_TAG} and {PROTOCOL}.",
+                  })}
+                </FormHelperText>
+              </FormControl>
+            </VStack>
+          )}
           <VStack alignItems="flex-start" w="full">
             <Text fontSize="sm">{t("inbound")}</Text>
             <SimpleGrid
@@ -463,6 +492,32 @@ const RadioCard: FC<
                   placeholder={t("userDialog.generatedByDefault")}
                   {...form.register("proxies.mtproto.secret")}
                 />
+              </FormControl>
+            </VStack>
+          )}
+          {title === "hysteria2" && isSelected && (
+            <VStack alignItems="flex-start" w="full">
+              <FormControl>
+                <Text fontSize="sm" pb={1}>
+                  {t("userDialog.hysteria2Password", {
+                    defaultValue: "Password",
+                  })}
+                </Text>
+                <Input
+                  fontSize="xs"
+                  size="sm"
+                  borderRadius="6px"
+                  pl={2}
+                  pr={2}
+                  placeholder={t("userDialog.generatedByDefault")}
+                  {...form.register("proxies.hysteria2.password")}
+                />
+                <FormHelperText fontSize="xs">
+                  {t("userDialog.hysteria2PasswordHelp", {
+                    defaultValue:
+                      "The client auth will be username:password, where username is the Marzban user.",
+                  })}
+                </FormHelperText>
               </FormControl>
             </VStack>
           )}

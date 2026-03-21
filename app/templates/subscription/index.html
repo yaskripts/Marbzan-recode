@@ -6,15 +6,15 @@
     <title>{{ user.username | e }} Subscription</title>
     <style>
         :root {
-            --bg: #07111f;
-            --bg-soft: rgba(10, 22, 38, 0.84);
-            --panel: rgba(14, 29, 48, 0.92);
-            --panel-soft: rgba(19, 37, 61, 0.86);
-            --line: rgba(132, 169, 214, 0.18);
+            --bg: #121926;
+            --bg-soft: rgba(26, 32, 44, 0.92);
+            --panel: rgba(34, 44, 59, 0.96);
+            --panel-soft: rgba(39, 49, 66, 0.92);
+            --line: rgba(116, 154, 236, 0.16);
             --text: #eef5ff;
-            --muted: #97aac6;
-            --accent: #46b4ff;
-            --accent-soft: rgba(70, 180, 255, 0.16);
+            --muted: #9aa9bf;
+            --accent: #4d7de7;
+            --accent-soft: rgba(77, 125, 231, 0.16);
             --green: #49d18c;
             --orange: #ffb14a;
             --red: #ff6d6d;
@@ -32,11 +32,11 @@
             margin: 0;
             min-height: 100vh;
             color: var(--text);
-            font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+            font-family: Inter, "Segoe UI", "Helvetica Neue", sans-serif;
             background:
-                radial-gradient(circle at top left, rgba(70, 180, 255, 0.18), transparent 30%),
-                radial-gradient(circle at top right, rgba(73, 209, 140, 0.14), transparent 24%),
-                linear-gradient(135deg, #04101d 0%, #081321 34%, #0a1a2f 100%);
+                radial-gradient(circle at top left, rgba(77, 125, 231, 0.18), transparent 30%),
+                radial-gradient(circle at top right, rgba(73, 209, 140, 0.1), transparent 24%),
+                linear-gradient(135deg, #0d1420 0%, #121926 34%, #182232 100%);
         }
 
         .shell {
@@ -531,10 +531,10 @@
         <section class="hero">
             <div class="hero-top">
                 <div>
-                    <div class="eyebrow">Subscription Center</div>
+                    <div class="eyebrow">Subscription Panel</div>
                     <h1>{{ user.username | e }}</h1>
                     <p class="subtitle">
-                        Clean client profiles, direct connection links, QR export and manual MTProto data in one page.
+                        Client profiles, direct import links, QR export and manual connection data in one place.
                     </p>
                     <div class="user-chip">
                         <span>User</span>
@@ -641,8 +641,7 @@
             <section class="panel">
                 <h2>Connection Links</h2>
                 <p class="panel-copy">
-                    Direct proxy links with custom names. These names are rendered from your host remarks, so labels like
-                    <strong>Poland - {{ user.username }}</strong> work as expected.
+                    Direct proxy links with custom names. If a protocol has its own config name, it overrides the host label for that user.
                 </p>
 
                 {% if user.status.value == 'active' and connection_links %}
@@ -677,9 +676,9 @@
 
                 {% if user.status.value == 'active' and manual_connections %}
                 <div style="margin-top: 22px;">
-                    <h2 style="margin-bottom: 8px;">MTProto</h2>
+                    <h2 style="margin-bottom: 8px;">Manual Connections</h2>
                     <p class="panel-copy" style="margin-bottom: 14px;">
-                        Telegram MTProto uses <strong>server</strong>, <strong>port</strong> and <strong>secret</strong>. This protocol does not use username/password authentication.
+                        Protocol-specific fields for clients that expect direct credentials instead of a generic subscription URL.
                     </p>
 
                     <div class="stack">
@@ -688,7 +687,15 @@
                             <div class="card-top">
                                 <div>
                                     <h3 class="card-title">{{ item.title | e }}</h3>
-                                    <p class="card-subtitle">Telegram proxy settings</p>
+                                    <p class="card-subtitle">
+                                        {% if item.protocol == 'HYSTERIA2' %}
+                                        Hysteria2 direct credentials
+                                        {% elif item.protocol == 'MTPROXY' %}
+                                        Standalone MTProxy with Fake TLS
+                                        {% else %}
+                                        Telegram proxy settings
+                                        {% endif %}
+                                    </p>
                                 </div>
                                 <span class="protocol-tag">{{ item.protocol | e }}</span>
                             </div>
@@ -704,23 +711,79 @@
                                 </div>
                             </div>
 
+                            {% if item.protocol == 'HYSTERIA2' %}
+                            <div class="inline-meta">
+                                <div class="field">
+                                    <label class="field-label">Username</label>
+                                    <input class="field-input" type="text" value="{{ item.username | e }}" readonly>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Password</label>
+                                    <input class="field-input" type="text" value="{{ item.password | e }}" readonly>
+                                </div>
+                            </div>
+
+                            {% if item.sni %}
+                            <div class="field">
+                                <label class="field-label">SNI</label>
+                                <input class="field-input" type="text" value="{{ item.sni | e }}" readonly>
+                            </div>
+                            {% endif %}
+
+                            {% if item.obfs_password %}
+                            <div class="field">
+                                <label class="field-label">Obfs Password</label>
+                                <input class="field-input" type="text" value="{{ item.obfs_password | e }}" readonly>
+                            </div>
+                            {% endif %}
+
+                            <div class="field">
+                                <label class="field-label">Auth</label>
+                                <input class="field-input" type="text" value="{{ item.auth | e }}" readonly>
+                            </div>
+
+                            {% if item.pin_sha256 %}
+                            <div class="field">
+                                <label class="field-label">Pin SHA256</label>
+                                <input class="field-input" type="text" value="{{ item.pin_sha256 | e }}" readonly>
+                            </div>
+                            {% endif %}
+                            {% else %}
                             <div class="field">
                                 <label class="field-label">Secret</label>
                                 <input class="field-input" type="text" value="{{ item.secret | e }}" readonly>
                             </div>
 
+                            {% if item.fake_tls_domain %}
+                            <div class="field">
+                                <label class="field-label">Fake TLS Domain</label>
+                                <input class="field-input" type="text" value="{{ item.fake_tls_domain | e }}" readonly>
+                            </div>
+                            {% endif %}
+                            {% endif %}
+
                             <div class="actions">
+                                {% if item.protocol == 'HYSTERIA2' %}
+                                <button class="button secondary js-copy" data-copy="{{ item.auth | e }}">Copy auth</button>
+                                {% if item.share_url %}
+                                <button class="button secondary js-copy" data-copy="{{ item.share_url | e }}">Copy link</button>
+                                <button class="button primary js-qr" data-qr="{{ item.share_url | e }}" data-title="{{ item.title | e }} Hysteria2">QR</button>
+                                {% endif %}
+                                {% else %}
                                 <a class="button-link ghost" href="{{ item.share_url | e }}" target="_blank" rel="noopener noreferrer">Open in Telegram</a>
+                                {% if item.telegram_url %}
+                                <button class="button secondary js-copy" data-copy="{{ item.telegram_url | e }}">Copy tg://</button>
+                                {% endif %}
                                 <button class="button secondary js-copy" data-copy="{{ item.secret | e }}">Copy secret</button>
-                                <button class="button primary js-qr" data-qr="{{ item.share_url | e }}" data-title="{{ item.title | e }} MTProto">QR</button>
+                                <button class="button primary js-qr" data-qr="{{ item.share_url | e }}" data-title="{{ item.title | e }} {{ item.protocol | e }}">QR</button>
+                                {% endif %}
                             </div>
                         </article>
                         {% endfor %}
                     </div>
 
                     <div class="notice">
-                        If you want labels like <strong>Poland - {{ user.username }}</strong>, set the host remark to a template such as
-                        <strong>Poland - {name}</strong> or <strong>Poland - {USERNAME}</strong>.
+                        You can name each exported config from the user editor. Templates like <strong>{name}</strong>, <strong>{USERNAME}</strong> and <strong>{INBOUND_TAG}</strong> are supported.
                     </div>
                 </div>
                 {% endif %}
