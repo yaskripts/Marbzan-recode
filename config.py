@@ -32,8 +32,10 @@ XRAY_FALLBACKS_INBOUND_TAG = config("XRAY_FALLBACKS_INBOUND_TAG", cast=str, defa
 XRAY_EXECUTABLE_PATH = config("XRAY_EXECUTABLE_PATH", default="/usr/local/bin/xray")
 XRAY_ASSETS_PATH = config("XRAY_ASSETS_PATH", default="/usr/local/share/xray")
 XRAY_EXCLUDE_INBOUND_TAGS = config("XRAY_EXCLUDE_INBOUND_TAGS", default='').split()
+XRAY_PUBLIC_HOST = config("XRAY_PUBLIC_HOST", default="")
 XRAY_SUBSCRIPTION_URL_PREFIX = config("XRAY_SUBSCRIPTION_URL_PREFIX", default="").strip("/")
 XRAY_SUBSCRIPTION_PATH = config("XRAY_SUBSCRIPTION_PATH", default="sub").strip("/")
+XRAY_TLS_ALLOW_INSECURE = config("XRAY_TLS_ALLOW_INSECURE", default=False, cast=bool)
 
 MTPROXY_ENABLED = config("MTPROXY_ENABLED", default=False, cast=bool)
 MTPROXY_NAME = config("MTPROXY_NAME", default="Telegram Proxy")

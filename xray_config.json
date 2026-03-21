@@ -2,7 +2,15 @@
   "log": {
     "loglevel": "warning"
   },
+  "dns": {
+    "servers": [
+      "1.1.1.1",
+      "8.8.8.8",
+      "localhost"
+    ]
+  },
   "routing": {
+    "domainStrategy": "IPIfNonMatch",
     "rules": [
       {
         "type": "field",
@@ -16,7 +24,7 @@
         "ip": [
           "geoip:private"
         ],
-        "outboundTag": "BLOCK"
+        "outboundTag": "DIRECT"
       }
     ]
   },
@@ -29,6 +37,17 @@
       "settings": {
         "clients": [],
         "decryption": "none"
+      },
+      "streamSettings": {
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/marbzan-recode/xray/server.crt",
+              "keyFile": "/etc/marbzan-recode/xray/server.key"
+            }
+          ]
+        }
       },
       "sniffing": {
         "enabled": true,
@@ -50,6 +69,15 @@
       },
       "streamSettings": {
         "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/marbzan-recode/xray/server.crt",
+              "keyFile": "/etc/marbzan-recode/xray/server.key"
+            }
+          ]
+        },
         "wsSettings": {
           "path": "/vless"
         }
@@ -72,6 +100,15 @@
       },
       "streamSettings": {
         "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/marbzan-recode/xray/server.crt",
+              "keyFile": "/etc/marbzan-recode/xray/server.key"
+            }
+          ]
+        },
         "wsSettings": {
           "path": "/vmess"
         }
@@ -85,19 +122,55 @@
       }
     },
     {
-      "tag": "SHADOWSOCKS TCP",
+      "tag": "TROJAN TLS",
       "listen": "0.0.0.0",
       "port": 10003,
+      "protocol": "trojan",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/marbzan-recode/xray/server.crt",
+              "keyFile": "/etc/marbzan-recode/xray/server.key"
+            }
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "SHADOWSOCKS TCP",
+      "listen": "0.0.0.0",
+      "port": 10004,
       "protocol": "shadowsocks",
       "settings": {
         "clients": [],
         "network": "tcp,udp"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
       }
     },
     {
       "tag": "MTPROTO",
       "listen": "0.0.0.0",
-      "port": 3443,
+      "port": 10443,
       "protocol": "mtproto",
       "settings": {
         "users": []

@@ -37,9 +37,11 @@ from config import (
     EXPIRED_STATUS_TEXT,
     LIMITED_STATUS_TEXT,
     ONHOLD_STATUS_TEXT,
+    XRAY_PUBLIC_HOST,
+    XRAY_TLS_ALLOW_INSECURE,
 )
 
-SERVER_IP = get_public_ip()
+SERVER_IP = XRAY_PUBLIC_HOST or get_public_ip()
 SERVER_IPV6 = get_public_ipv6()
 
 STATUS_EMOJIS = {
@@ -207,11 +209,12 @@ def iter_resolved_hosts(
             if host.get("use_sni_as_host", False) and sni:
                 req_host = sni
 
-            allow_insecure = (
-                inbound.get("allowinsecure", "")
-                if host["allowinsecure"] is None
-                else host["allowinsecure"]
-            )
+            if host["allowinsecure"] is None:
+                allow_insecure = inbound.get("allowinsecure", "")
+                if allow_insecure in ("", None) and inbound.get("tls") == "tls":
+                    allow_insecure = XRAY_TLS_ALLOW_INSECURE
+            else:
+                allow_insecure = host["allowinsecure"]
 
             host_inbound.update(
                 {

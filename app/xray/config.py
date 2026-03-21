@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from copy import deepcopy
-from pathlib import PosixPath
+from pathlib import Path, PosixPath
 from typing import Union
 
 import commentjson
@@ -216,11 +216,13 @@ class XRayConfig(dict):
                     # settings['alpn']
                     settings['tls'] = 'tls'
                     for certificate in tls_settings.get('certificates', []):
+                        cert = None
 
                         if certificate.get("certificateFile", None):
-                            with open(certificate['certificateFile'], 'rb') as file:
-                                cert = file.read()
-                                settings['sni'].extend(get_cert_SANs(cert))
+                            cert_path = Path(certificate["certificateFile"])
+                            if cert_path.is_file():
+                                with cert_path.open('rb') as file:
+                                    cert = file.read()
 
                         if certificate.get("certificate", None):
                             cert = certificate['certificate']
@@ -228,6 +230,8 @@ class XRayConfig(dict):
                                 cert = '\n'.join(cert)
                             if isinstance(cert, str):
                                 cert = cert.encode()
+
+                        if cert:
                             settings['sni'].extend(get_cert_SANs(cert))
 
                 elif security == 'reality':

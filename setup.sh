@@ -43,6 +43,9 @@ HYSTERIA2_CONFIG_FILE="${HYSTERIA2_CONFIG_FILE:-/etc/hysteria/config.yaml}"
 HYSTERIA2_CERT_DIR="${HYSTERIA2_CERT_DIR:-/etc/hysteria/certs}"
 HYSTERIA2_CERT_FILE="${HYSTERIA2_CERT_DIR}/server.crt"
 HYSTERIA2_KEY_FILE="${HYSTERIA2_CERT_DIR}/server.key"
+XRAY_TLS_CERT_DIR="${XRAY_TLS_CERT_DIR:-/etc/marbzan-recode/xray}"
+XRAY_TLS_CERT_FILE="${XRAY_TLS_CERT_DIR}/server.crt"
+XRAY_TLS_KEY_FILE="${XRAY_TLS_CERT_DIR}/server.key"
 HYSTERIA2_PUBLIC_HOST_VALUE=""
 HYSTERIA2_SNI_VALUE=""
 HYSTERIA2_CERT_FILE_VALUE=""
@@ -350,7 +353,7 @@ set_env_value() {
 }
 
 configure_env() {
-    local subscription_prefix allowed_origins
+    local subscription_prefix allowed_origins public_node_host
 
     if [[ ! -f "$APP_DIR/.env" ]]; then
         cp "$APP_DIR/.env.example" "$APP_DIR/.env"
@@ -369,6 +372,8 @@ configure_env() {
         detect_public_host
         [[ -n "$PUBLIC_HOST" ]] || die "unable to detect public host, rerun setup.sh with --public-host <server-ip>"
     fi
+
+    public_node_host="${DOMAIN:-$PUBLIC_HOST}"
 
     subscription_prefix="http://${PUBLIC_HOST:-$DOMAIN}"
     if [[ "$ENABLE_SSL" == "true" && -n "$DOMAIN" ]]; then
@@ -391,7 +396,9 @@ configure_env() {
     set_env_value "SUDO_PASSWORD" "$ADMIN_PASSWORD"
     set_env_value "XRAY_EXECUTABLE_PATH" "/usr/local/bin/xray"
     set_env_value "XRAY_ASSETS_PATH" "/usr/local/share/xray"
+    set_env_value "XRAY_PUBLIC_HOST" "$public_node_host"
     set_env_value "XRAY_SUBSCRIPTION_URL_PREFIX" "\"${subscription_prefix}\""
+    set_env_value "XRAY_TLS_ALLOW_INSECURE" "True"
     set_env_value "ALLOWED_ORIGINS" "\"${allowed_origins}\""
 
     chown "$APP_USER:$APP_GROUP" "$APP_DIR/.env"
@@ -450,12 +457,17 @@ compute_hysteria2_pin() {
     openssl x509 -in "$cert_file" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d '\r\n'
 }
 
-generate_hysteria2_self_signed_cert() {
+generate_self_signed_cert() {
     local host="$1"
+    local cert_file="$2"
+    local key_file="$3"
+    local reader_group="$4"
+    local cert_dir
     local san
     local openssl_config
 
-    install -d -m 0755 "$HYSTERIA2_CERT_DIR"
+    cert_dir="$(dirname "$cert_file")"
+    install -d -o root -g "$reader_group" -m 0750 "$cert_dir"
 
     if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         san="IP:${host}"
@@ -463,7 +475,7 @@ generate_hysteria2_self_signed_cert() {
         san="DNS:${host}"
     fi
 
-    log "generating self-signed certificate for Hysteria2 (${host})"
+    log "generating self-signed certificate for ${host}"
     openssl_config="$(mktemp)"
     cat >"$openssl_config" <<EOF
 [req]
@@ -479,12 +491,36 @@ subjectAltName = ${san}
 EOF
 
     openssl req -x509 -nodes -newkey rsa:2048 \
-        -keyout "$HYSTERIA2_KEY_FILE" \
-        -out "$HYSTERIA2_CERT_FILE" \
+        -keyout "$key_file" \
+        -out "$cert_file" \
         -days 3650 \
         -config "$openssl_config" \
         -extensions v3_req >/dev/null 2>&1
     rm -f "$openssl_config"
+
+    chown root:"$reader_group" "$cert_file" "$key_file"
+    chmod 0640 "$cert_file" "$key_file"
+}
+
+prepare_xray_tls_assets() {
+    local host
+
+    host="${DOMAIN:-$PUBLIC_HOST}"
+    [[ -n "$host" ]] || die "unable to determine host for Xray TLS assets"
+
+    log "generating self-signed certificate for Xray (${host})"
+    generate_self_signed_cert "$host" "$XRAY_TLS_CERT_FILE" "$XRAY_TLS_KEY_FILE" "$APP_GROUP"
+}
+
+generate_hysteria2_self_signed_cert() {
+    local host="$1"
+    local reader_group="root"
+
+    if getent group hysteria >/dev/null 2>&1; then
+        reader_group="hysteria"
+    fi
+
+    generate_self_signed_cert "$host" "$HYSTERIA2_CERT_FILE" "$HYSTERIA2_KEY_FILE" "$reader_group"
 }
 
 configure_hysteria2_env() {
@@ -787,6 +823,7 @@ main() {
     clone_or_update_repo
     install_xray
     configure_env
+    prepare_xray_tls_assets
     configure_mtproxy_env
     install_mtproxy
     install_python_app

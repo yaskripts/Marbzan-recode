@@ -13,7 +13,8 @@ def get_inbounds_by_protocol() -> dict[str, list[dict[str, Any]]]:
         for protocol, inbounds in xray.config.inbounds_by_protocol.items()
     }
     for protocol, inbounds in get_virtual_inbounds_by_protocol().items():
-        merged[protocol] = [deepcopy(inbound) for inbound in inbounds]
+        merged.setdefault(protocol, [])
+        merged[protocol].extend(deepcopy(inbound) for inbound in inbounds)
     return merged
 
 
